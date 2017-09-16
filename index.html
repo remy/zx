@@ -1,0 +1,27 @@
+<img src="cfp-people.gif" hidden>
+<script type="text/html" id="index">
+  <link rel="stylesheet" href="styles.css">
+  <ul>
+    <li><a href="?1-440">1-440</a></li>
+    <li><a href="?2-square">2-square</a></li>
+    <li><a href="?3-noise">3-noise</a></li>
+    <li><a href="?4-binary">4-binary</a></li>
+    <li><a href="?5-convert">5-convert</a></li>
+    <li><a href="?6-image">6-image</a></li>
+    <li><a href="?7-bars">7-bars</a></li>
+    <li><a href="?8-bars-cheat">8-bars-cheat</a></li>
+    <li><a href="?rom-loader">rom-loader</a></li>
+    <li><a href="?t-state">t-state</a></li>
+  </ul>
+</script>
+<script>
+  if (window.location.search) {
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = window.location.search.substr(1) + '.js';
+    document.documentElement.appendChild(script);
+  } else {
+    document.documentElement.innerHTML = document.querySelector('#index').innerHTML;
+  }
+
+</script>
