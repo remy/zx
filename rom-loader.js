@@ -115,7 +115,7 @@ function loadSync(buffer) {
     return false;
   }
 
-  console.log('got sync');
+  console.log('sync OK');
   return true;
 }
 
@@ -133,6 +133,8 @@ function loadHeader(buffer) {
     console.error('R Tape Loading Error', parity, bytes[bytes.length - 1]);
     return null;
   }
+
+  console.log('header OK');
 
   const filename = decode(bytes.slice(1, 10)); // filename is in position 1…11
   const length = (bytes[11] << 8) + bytes[12]; // length is held in 2 bytes
@@ -209,8 +211,8 @@ export default function read(data) {
     return;
   }
 
-  console.log('filename: %s|', header.filename);
-  console.log('bytes: %s|', header.length);
+  console.log('filename: "%s"', header.filename);
+  console.log('bytes: %s', header.length);
 
   const bytes = loadBytes(header.length, data);
 
