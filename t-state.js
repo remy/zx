@@ -1,11 +1,13 @@
 import Audio from './audio.js';
-import Analyser from './analyser.js';
 import canvas from './canvas.js';
 
-const audio = (window.audio = new Audio());
-audio.volume = 100;
-const analyser = (window.analyser = new Analyser());
-audio.start();
-analyser.connect(audio);
+async function main() {
+  const audio = (window.audio = new Audio());
+  await audio.load(document.querySelector('img'));
+  audio.volume = 100;
+  audio.start();
 
-canvas.connect(audio.node);
+  canvas.connect(audio.node);
+}
+
+main();

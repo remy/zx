@@ -1,21 +1,25 @@
 import ctx from './ctx.js';
+import image from './image.js';
 export const SAMPLE_RATE = ctx.sampleRate;
 export const T = 1 / 3500000; // pulse width (half a wave cycle) in ms @ 3.5Mhz
 
 /**
  * notes
  * 440Hz = 1 tick every 2.2727ms
- * 855 * 2 * T = 1710 * T = ZERO sound = 0.489ms
+ * 855 * 2 * T = 1710 * T = ZERO bit sound = 0.489ms
  * 1.19047619ms ~ the 840Hz which should be equal to 2168 T (.619428571ms)
  * Pilot is 2168 T for a length of 8063, therefore: (8063 * 2168) * (1/3500000) = ~5 (5 seconds)
  */
 
 export const asHz = pulse => 1 / (T * pulse);
-const toAngularFrequency = hz => hz * 2 * Math.PI;
+// const toAngularFrequency = hz => hz * 2 * Math.PI;
 
+// these are how high and low the pulse value goes in the audio buffer
+// 1 and -1 being the extreme max
 const HIGH = 0.15;
 const LOW = -0.15;
 
+// pulse lengths defined by ZX ROM documentation
 export const PILOT = 2168;
 export const ZERO = 855;
 export const ONE = 2 * ZERO;
@@ -26,39 +30,41 @@ const zeroBit = generateBit(ZERO);
 const oneBit = generateBit(ONE);
 
 const _volume = Symbol('volume');
-const _frequency = Symbol('frequency');
 
-// IMPORTANT: mutates buffer
-export function generateFlatSamples({
-  output,
-  i,
-  pulse,
-  length = pulse,
-  value = HIGH,
-}) {
-  length = length * T * SAMPLE_RATE;
-  i = (i + 0.5) | 0; // round the i value
-  length = (i + length + 0.5) | 0;
-  for (; i < length; i++) {
+/**
+ * Generates AudioContext buffer compatible values into options.output
+ * @param {Object} options - options to generate samples
+ * @param {Float32Array} options.output - array buffer to mutate
+ * @param {Number} options.i - offset to insert samples into output
+ * @param {Number} options.pulse - pulse length in t-states
+ * @param {Number=HIGH} options.value - value to use for sample
+ * @returns {Number} Updated offset
+ */
+export function generateFlatSamples({ output, i, pulse, value = HIGH }) {
+  pulse = pulse * T * SAMPLE_RATE;
+  // round values to integers
+  i = (i + 0.5) | 0;
+  pulse = (i + pulse + 0.5) | 0;
+  for (; i < pulse; i++) {
     const noise = 0; // Math.random() * 0.01 * (value < 0 ? -1 : 0);
     output[i] = value + noise;
   }
 
-  return length;
+  return pulse;
 }
 
-export function generateSamplesForRange({ output, i, pulse, length = pulse }) {
-  length = length * T * SAMPLE_RATE;
-  const freq = toAngularFrequency(asHz(pulse));
-  i = (i + 0.5) | 0; // round the i value
-  length = (i + length + 0.5) | 0;
-  for (; i < length; i++) {
-    const sampleTime = i / SAMPLE_RATE;
-    const sampleAngle = sampleTime * freq;
-    const noise = Math.random() * 0.01;
-    output[i] = Math.sin(sampleAngle) < 0 ? LOW - noise : HIGH + noise;
-  }
-}
+// function generateSamplesForRange({ output, i, pulse, length = pulse }) {
+//   length = length * T * SAMPLE_RATE;
+//   const freq = toAngularFrequency(asHz(pulse));
+//   i = (i + 0.5) | 0; // round the i value
+//   length = (i + length + 0.5) | 0;
+//   for (; i < length; i++) {
+//     const sampleTime = i / SAMPLE_RATE;
+//     const sampleAngle = sampleTime * freq;
+//     const noise = Math.random() * 0.01;
+//     output[i] = Math.sin(sampleAngle) < 0 ? LOW - noise : HIGH + noise;
+//   }
+// }
 
 function generateBit(pulse) {
   const output = new Float32Array((pulse * 2 * T * SAMPLE_RATE + 0.5) | 0);
@@ -83,30 +89,17 @@ function generateBit(pulse) {
 function generatePilot(output, count = 8063) {
   const pulse = PILOT;
   let offset = 0;
-  const add = pulse * T * SAMPLE_RATE;
-  // const output = new Float32Array(
-  //   (pulse * 2 * count * T * SAMPLE_RATE + 0.5) | 0
-  // );
 
-  console.log('pilot values: %s', (count / 2 + 1) | 0);
-
-  for (let i = 0; i < ((count / 2 + 1) | 0); i++) {
-    generateFlatSamples({
+  // small bug in my own logic, this produces 8064 half pulses
+  // this is because the immediately next pulse is a syn on, which
+  // is also high, so it doesn't offer any edge detection.
+  for (let i = 0; i < count; i++) {
+    offset = generateFlatSamples({
       output,
       i: offset,
       pulse,
-      value: 0.16,
+      value: i % 2 === 0 ? LOW : HIGH,
     });
-
-    offset += add;
-    generateFlatSamples({
-      output,
-      i: offset,
-      pulse,
-      value: -0.16,
-    });
-
-    offset += add;
   }
 
   return offset;
@@ -115,7 +108,6 @@ function generatePilot(output, count = 8063) {
 function generateBytes({ offset = 0, data, output }) {
   for (let j = 0; j < data.length; j++) {
     const pulse = data[j];
-    // console.log(pulse);
     for (let i = 0; i < 8; i++) {
       // IMPORTANT: this is specifically a left shift AND 128 so that
       // the bits are collected in the correct order to build up a byte.
@@ -138,17 +130,6 @@ function generateBytes({ offset = 0, data, output }) {
  */
 export const calculateXORChecksum = array =>
   array.reduce((checksum, item) => checksum ^ item, 0);
-
-// const toBinary = s =>
-//   parseInt(s, 16)
-//     .toString(2)
-//     .padStart(8, '0');
-
-// const charToBinary = s =>
-//   s
-//     .charCodeAt(0)
-//     .toString(2)
-//     .padStart(8, '0');
 
 /**
  * Construct buffer for pilot, syn(on|off), header and data binary
@@ -213,12 +194,6 @@ export function generateHeader(ctx, filename = 'ZX Loader', data = [0]) {
   const output = buffer.getChannelData(0);
 
   // pilot tone
-  // generateSamplesForRange({
-  //   output,
-  //   i: 0,
-  //   length: 8063 * PILOT,
-  //   pulse: PILOT * 2,
-  // });
   let offset = generatePilot(output);
 
   // syn on
@@ -237,10 +212,6 @@ export function generateHeader(ctx, filename = 'ZX Loader', data = [0]) {
     value: LOW,
   });
 
-  // offset += (1000 * T * SAMPLE_RATE + 1.5) | 0;
-
-  console.log(header);
-
   offset = generateBytes({
     offset,
     output,
@@ -257,26 +228,21 @@ export function generateHeader(ctx, filename = 'ZX Loader', data = [0]) {
 }
 
 export default class Audio {
-  constructor({ volume = 30, frequency = 807 } = {}) {
-    // const src = (this.src = ctx.createScriptProcessor(
-    //   256 * Math.pow(2, FACTOR),
-    //   1,
-    //   1
-    // ));
-
-    const header = generateHeader(ctx);
+  constructor({ volume = 30 } = {}) {
     const src = (this.src = ctx.createBufferSource());
-    src.buffer = header;
-
-    const oscillator = (this.oscillator = ctx.createOscillator());
-    oscillator.type = 'square';
     const gain = (this.gain = ctx.createGain());
 
     this.volume = volume;
-    this.frequency = frequency;
 
     src.connect(gain);
     src.start();
+  }
+
+  async load(element) {
+    const filename = element.src.split('/').pop();
+    const binary = await image(element);
+    const buffer = generateHeader(ctx, filename, binary);
+    this.src.buffer = buffer;
   }
 
   start() {
@@ -289,24 +255,6 @@ export default class Audio {
 
   get node() {
     return this.src;
-  }
-
-  play(data = '0000 0000 0000 1111'.repeat(8)) {
-    data = data
-      .replace(/\s/g, '')
-      .split('')
-      .map(_ => (_ === '1' ? 1 : 0));
-
-    // const LEN = data.length * ONE;
-  }
-
-  get frequency() {
-    return this[_frequency];
-  }
-
-  set frequency(v) {
-    this[_frequency] = v;
-    this.oscillator.frequency.value = v;
   }
 
   get volume() {

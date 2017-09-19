@@ -2,13 +2,13 @@ import ctx from './ctx.js';
 const noop = () => {};
 const _rafTimer = Symbol('rafTimer');
 
-export default class Audio {
+export default class Analyser {
   constructor({ draw = noop } = {}) {
     const analyser = (this.analyser = ctx.createAnalyser());
-    analyser.fftSize = 2048;
+    analyser.fftSize = Math.pow(2, 13); // 4096
     const length = (this.length = analyser.frequencyBinCount);
 
-    this.data = new Uint8Array(length);
+    this.data = new Float32Array(length);
     this.callback = draw;
     this[_rafTimer] = null;
   }
@@ -23,14 +23,14 @@ export default class Audio {
   }
 
   start(callback = this.callback) {
-    const loop = () => {
+    const loop = now => {
       if (this[_rafTimer] === null) {
         return;
       }
 
-      this.analyser.getByteTimeDomainData(this.data);
-      if (callback(this.data) !== false) {
-        this[_rafTimer] = requestAnimationFrame(() => loop());
+      this.analyser.getFloatTimeDomainData(this.data);
+      if (callback(this.data, now) !== false) {
+        this[_rafTimer] = requestAnimationFrame(loop);
       }
     };
 

@@ -83,7 +83,7 @@ function loadBytes(length, buffer) {
 }
 
 function loadPilot(buffer) {
-  const pulses = 8064;
+  const pulses = 8063;
   for (let i = 1; i <= pulses; i++) {
     const pulse = loadEdge1(buffer);
 
@@ -156,7 +156,7 @@ function loadEdge2(buffer, log = false) {
   return [loadEdge1(buffer, log), loadEdge1(buffer, log)];
 }
 
-function loadEdge1(buffer, log = false) {
+export function loadEdge1(buffer, log = false) {
   // log = false;
   const length = buffer.length;
 
@@ -200,6 +200,14 @@ function loadEdge1(buffer, log = false) {
 }
 
 export default function read(data) {
+  console.log(
+    'samples: %s, duration: %s',
+    data.length,
+    new Date(round(data.length / SAMPLE_RATE) * 1000)
+      .toJSON()
+      .split('T')
+      .pop()
+  );
   loadPilot(data);
   if (!loadSync(data)) {
     return;

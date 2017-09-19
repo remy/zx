@@ -19,6 +19,7 @@ const h = (canvas.height = window.innerHeight * 0.8);
 
 export function draw(data) {
   const length = data.length;
+  // console.log(length);
   ctx.clearRect(0, 0, w, h);
 
   ctx.lineWidth = 1;
@@ -26,11 +27,11 @@ export function draw(data) {
 
   ctx.beginPath();
 
-  var sliceWidth = w * 1.0 / length;
+  var sliceWidth = w * 2 / length;
   var x = 0;
 
   for (var i = 0; i < length; i++) {
-    var v = data[i] / 128.0;
+    var v = data[i] < 0.1 ? 0.8 : 1.2; //  / 128.0;
     var y = v * canvas.height / 2;
 
     if (i === 0) {
