@@ -1,4 +1,4 @@
-import Analyser from './analyser.js';
+import ctx from './ctx.js';
 import {
   calculateXORChecksum,
   asHz,
@@ -11,30 +11,46 @@ import {
 
 const decode = a => new TextDecoder().decode(a);
 
+const bufferSize = 2 ** 12;
 const round = (n, i = 4) => n.toFixed(i);
 const pilotLength = round(1 / asHz(PILOT));
 const oneLength = round(1 / asHz(ONE * 2), 3);
-const zeroLength = round(1 / asHz(ZERO * 2), 3);
+// const zeroLength = round(1 / asHz(ZERO * 2), 3);
 let SAMPLE_RATE = 0;
 
 export const isEdge = (a, b) => !((a >= 0) ^ (b < 0));
 
-export default class ROMLoader extends Analyser {
+export default class ROMLoader {
   constructor() {
-    super();
-    this.read = this.read.bind(this);
-    this.callback = this.read;
-    this.pulseBuffer = new Float32Array(this.analyser.fftSize * 2);
+    this.pulseBuffer = new Float32Array(bufferSize * 2);
     this.edgePtr = 0;
     this.pulseBufferPtr = 0;
-    this.byteBuffer = new Uint8Array(1);
-    this.bytesBuffer = new Uint8Array(0xffff);
-    this.bytesPtr = 0;
+    // this.byteBuffer = new Uint8Array(1);
+    // this.bytesBuffer = new Uint8Array(0xffff);
+    // this.bytesPtr = 0;
+
     this.lastCall = null;
     this.timing = 0;
 
+    //*
+    this.node = ctx.createScriptProcessor(bufferSize, 1, 1);
+    this.node.onaudioprocess = audioProcessingEvent => {
+      const channel = 0;
+      const inputBuffer = audioProcessingEvent.inputBuffer;
+      const input = inputBuffer.getChannelData(channel);
+
+      // then we'll read the values for own processing
+      this.read(input, performance.now());
+
+      // copy the input directly across to the output
+      const outputBuffer = audioProcessingEvent.outputBuffer;
+      const output = outputBuffer.getChannelData(channel);
+      inputBuffer.copyFromChannel(output, channel, channel);
+    };
+
+    //*/
+
     this.readCount = 0;
-    this.zeroCounter = 0;
     this.edgeCounter = 0;
 
     this.state = {
@@ -43,6 +59,8 @@ export default class ROMLoader extends Analyser {
       synOff: false,
       header: false,
       data: [],
+      bad: [],
+      pulses: [],
     };
 
     this.handlers = {
@@ -55,60 +73,64 @@ export default class ROMLoader extends Analyser {
   }
 
   connect(target) {
-    target.node.connect(this.analyser);
+    target.node.connect(this.node);
+    this.node.connect(target.gain);
     this.lastCall = window.performance.now();
-    this.start();
   }
 
   update() {
-    window.cancelAnimationFrame(this.updateTimer);
-    this.updateTimer = window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       this.handlers.update(this);
     });
   }
 
-  // FIXME this will break if we're in the middle of a pulse
   read(data, callTime) {
     this.readCount++;
 
+    // const data = Float32Array.from(_data);
+
     this.edgePtr = 0;
-    this.timing = callTime - this.lastCall;
+    this.timing = (callTime - this.lastCall) | 0;
+
     this.lastCall = callTime;
 
-    SAMPLE_RATE = data.length; //data.length * (1000 / this.timing);
-    this.SAMPLE_RATE = SAMPLE_RATE;
+    this.SAMPLE_RATE = SAMPLE_RATE = 44100; //(data.length * (1000 / this.timing)) | 0;
 
     if (this.state.synOff) {
       return;
     }
 
-    if (this.readCount > 400) {
-      this.stop();
-      return;
-    }
-
-    // if (data.filter(Boolean).length === 0) {
+    // if (this.readCount > 2) {
     //   return;
     // }
 
+    if (this.readCount > 1) {
+      // eval('debugger');
+    }
+
+    if (data.filter(Boolean).length === 0) {
+      return;
+    }
+
+    console.log('read: %s', this.pulseBufferPtr);
+
     let pulse = null;
-    do {
-      pulse = this.readPulse(data);
-      if (pulse !== null) {
-        this.readPilot(pulse);
-        this.readSyn(pulse);
-      }
+    while ((pulse = this.readPulse(data))) {
+      this.readPilot(pulse);
+      this.readSyn(pulse);
       this.update();
-    } while (pulse !== null);
+      this.state.pulses.push(pulse);
+    }
   }
 
-  readPulse(buffer, log = false) {
-    // log = true;
+  readPulse(buffer) {
     const length = buffer.length;
 
     if (!length) {
       return null;
     }
+
+    let previously = this.pulseBufferPtr;
 
     let last =
       this.pulseBufferPtr > 0 ? this.pulseBuffer[this.pulseBufferPtr] : null;
@@ -116,30 +138,35 @@ export default class ROMLoader extends Analyser {
     for (; this.edgePtr < length; this.edgePtr++) {
       let point = buffer[this.edgePtr];
 
+      if (previously) {
+        console.log(
+          '%s: %s (last %s), edge? %s',
+          this.state.pulses.length,
+          point,
+          last,
+          isEdge(point, last),
+          this.pulseBufferPtr
+        );
+        previously = false;
+      }
+
       // search for when the buffer point crosses the zero threshold
       if (last !== null) {
         if (point === 0) {
-          this.zeroCounter++;
           continue;
-          // console.log('zero edge: %s', isEdge(point, last));
         }
-        if (log) {
-          console.log(
-            '%s: %s (last %s), edge? %s',
-            this.pulseBufferPtr,
-            point,
-            last,
-            isEdge(point, last)
-          );
-        }
-        if (isEdge(point, last)) {
+
+        if (!previously && isEdge(point, last)) {
           // important: when we hit an edge, the data doesn't include the edge
           // itself as determined by the use of `i` rather than edgePtr
-          const res = this.pulseBuffer.subarray(1, this.pulseBufferPtr - 1);
+          const pulse = this.pulseBufferPtr; // this.pulseBuffer.subarray(1, this.pulseBufferPtr - 1);
+
+          // if (pulse === 1) {
+          console.log('edge found: %s', pulse);
+          // }
           this.pulseBufferPtr = 0;
           this.edgeCounter++;
-          // res.forEach((_, i) => console.log('%s: %s', i, _));
-          return res;
+          return pulse;
         }
         this.pulseBuffer[this.pulseBufferPtr] = point;
       }
@@ -148,7 +175,12 @@ export default class ROMLoader extends Analyser {
       this.pulseBufferPtr++;
     }
 
-    // console.error('found no edge');
+    // const pulse = this.pulseBufferPtr;
+    this.pulseBufferPtr--; // back up one point
+    // this.edgeCounter++;
+
+    // return pulse;
+
     return null; // no edge found
   }
 
@@ -183,16 +215,31 @@ export default class ROMLoader extends Analyser {
     const state = this.state;
     if (state.pilot !== true) {
       // check that the pulse width is right
-      const length = 1 / SAMPLE_RATE * pulse.length;
-      if (round(length) !== pilotLength) {
-        // edgePtr -= pulse.length;
-        // console.log(
-        //   'pilot found %s good pulses',
-        //   state.pilot - 1,
-        //   round(length)
-        // );
-        // console.log('bad pulse %s !== %s', round(length), pilotLength);
-        // pulse.forEach((_, i) => console.log('%s: %s', i, _));
+      const length = round(1 / SAMPLE_RATE * pulse);
+      if (length !== pilotLength) {
+        if (length < pilotLength) {
+          // edgePtr -= pulse;
+          console.log(
+            'bad pulse (%s) %s !== %s @ %s',
+            pulse,
+            length,
+            pilotLength,
+            this.state.pulses.length
+          );
+
+          this.state.bad.push({
+            length,
+            pulse,
+            i: this.state.pulses.length,
+            ptr: this.pulseBufferPtr,
+          });
+
+          // this.edgeCounter -= pulse;
+          // this.pulseBufferPtr += pulse;
+        } else {
+          console.log('failed pilot was longer');
+        }
+
         return;
       }
       state.pilot++;
@@ -227,7 +274,7 @@ export default class ROMLoader extends Analyser {
 
   expectPulse(pulse, tStates) {
     const expect = round(1 / asHz(tStates));
-    const length = round(1 / SAMPLE_RATE * pulse.length);
+    const length = round(1 / SAMPLE_RATE * pulse);
     if (length !== expect) {
       // console.error('!expectPulse length: %s, expected: %s', length, expect);
     }

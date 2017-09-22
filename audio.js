@@ -46,7 +46,7 @@ export function generateFlatSamples({ output, i, pulse, value = HIGH }) {
   i = (i + 0.5) | 0;
   pulse = (i + pulse + 0.5) | 0;
   for (; i < pulse; i++) {
-    const noise = 0; // Math.random() * 0.01 * (value < 0 ? -1 : 0);
+    const noise = Math.random() * 0.01 * (value < 0 ? -1 : 1);
     output[i] = value + noise;
   }
 
@@ -235,7 +235,6 @@ export default class Audio {
     this.volume = volume;
 
     src.connect(gain);
-    src.start();
   }
 
   async load(element) {
@@ -247,6 +246,7 @@ export default class Audio {
 
   start() {
     this.gain.connect(ctx.destination);
+    this.src.start();
   }
 
   stop() {

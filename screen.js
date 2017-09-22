@@ -5,7 +5,7 @@ import canvas from './canvas.js';
 async function main() {
   const audio = (window.audio = new Audio());
   await audio.load(document.querySelector('img'));
-  audio.volume = 100;
+  audio.volume = 20;
   const rom = (window.rom = new ROMLoader());
   rom.connect(audio);
   canvas.connect(audio.node);
@@ -18,8 +18,6 @@ async function main() {
   rom.handlers.update = () => {
     pre.innerHTML = `edgePtr: ${rom.edgePtr}
 pulseBufferPtr: ${rom.pulseBufferPtr}
-pulseBuffer: ${rom.pulseBuffer[1]}
-zeroCounter: ${rom.zeroCounter}
 readCount: ${rom.readCount}
 edgeCounter: ${rom.edgeCounter}
 timing: ${rom.timing}
@@ -30,7 +28,7 @@ SYN_ON: ${rom.state.synOn}
 SYN_OFF: ${rom.state.synOff}`;
   };
 
-  audio.start();
+  setTimeout(() => audio.start(), 0);
 }
 
 main();
