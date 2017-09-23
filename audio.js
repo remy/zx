@@ -21,6 +21,7 @@ const LOW = -0.15;
 
 // pulse lengths defined by ZX ROM documentation
 export const PILOT = 2168;
+export const PILOT_COUNT = 8063;
 export const ZERO = 855;
 export const ONE = 2 * ZERO;
 export const SYN_ON = 667;
@@ -86,7 +87,7 @@ function generateBit(pulse) {
   return output;
 }
 
-function generatePilot(output, count = 8063) {
+function generatePilot(output, count = PILOT_COUNT) {
   const pulse = PILOT;
   let offset = 0;
 
@@ -139,7 +140,7 @@ export const calculateXORChecksum = array =>
  * @returns AudioBuffer
  */
 export function generateHeader(ctx, filename = 'ZX Loader', data = [0]) {
-  const pilotLength = 8063 * PILOT;
+  const pilotLength = PILOT_COUNT * PILOT;
   const synLength = SYN_ON + SYN_OFF;
 
   const length = data.length; // data is in binary, but we want to store byte length

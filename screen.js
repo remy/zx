@@ -15,6 +15,20 @@ async function main() {
   pre.style.position = 'relative';
   pre.style.zIndex = 1;
 
+  const img = new Image();
+  document.body.appendChild(img);
+
+  rom.handlers.bytes = bytes => {
+    // const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
+    // const url = URL.createObjectURL(blob);
+    // img.src = url;
+  };
+
+  rom.handlers.end = () => {
+    console.log('stopping');
+    canvas.stop();
+  };
+
   rom.handlers.update = () => {
     pre.innerHTML = `edgePtr: ${rom.edgePtr}
 pulseBufferPtr: ${rom.pulseBufferPtr}

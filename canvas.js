@@ -6,6 +6,9 @@ export default {
     analyser.connect({ node });
     analyser.start(draw);
   },
+  stop: () => {
+    analyser.stop();
+  },
 };
 
 const canvas = document.createElement('canvas');

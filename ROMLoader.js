@@ -1,5 +1,6 @@
 import ctx from './ctx.js';
 import {
+  PILOT_COUNT,
   calculateXORChecksum,
   asHz,
   PILOT,
@@ -16,7 +17,7 @@ const round = (n, i = 4) => n.toFixed(i);
 const pilotLength = round(1 / asHz(PILOT));
 const oneLength = round(1 / asHz(ONE * 2), 3);
 // const zeroLength = round(1 / asHz(ZERO * 2), 3);
-let SAMPLE_RATE = 0;
+const SAMPLE_RATE = 44100;
 
 export const isEdge = (a, b) => !((a >= 0) ^ (b < 0));
 
@@ -25,14 +26,18 @@ export default class ROMLoader {
     this.pulseBuffer = new Float32Array(bufferSize * 2);
     this.edgePtr = 0;
     this.pulseBufferPtr = 0;
-    // this.byteBuffer = new Uint8Array(1);
-    // this.bytesBuffer = new Uint8Array(0xffff);
-    // this.bytesPtr = 0;
+    this.byteBuffer = new Uint8Array(1);
+    this.bytePtr = 0;
+    this.bitPair = [];
+    this.bytesBuffer = new Uint8Array(0xffff);
+    this.bytesPtr = 0;
 
     this.lastCall = null;
     this.timing = 0;
 
-    //*
+    const img = (this.img = new Image());
+    document.body.appendChild(img);
+
     this.node = ctx.createScriptProcessor(bufferSize, 1, 1);
     this.node.onaudioprocess = audioProcessingEvent => {
       const channel = 0;
@@ -48,17 +53,17 @@ export default class ROMLoader {
       inputBuffer.copyFromChannel(output, channel, channel);
     };
 
-    //*/
-
     this.readCount = 0;
     this.edgeCounter = 0;
+
+    this.SAMPLE_RATE = SAMPLE_RATE;
 
     this.state = {
       pilot: 0,
       synOn: false,
       synOff: false,
       header: false,
-      data: [],
+      data: false,
       bad: [],
       pulses: [],
     };
@@ -87,6 +92,8 @@ export default class ROMLoader {
   read(data, callTime) {
     this.readCount++;
 
+    this._data = data;
+
     // const data = Float32Array.from(_data);
 
     this.edgePtr = 0;
@@ -94,43 +101,31 @@ export default class ROMLoader {
 
     this.lastCall = callTime;
 
-    this.SAMPLE_RATE = SAMPLE_RATE = 44100; //(data.length * (1000 / this.timing)) | 0;
-
-    if (this.state.synOff) {
-      return;
-    }
-
-    // if (this.readCount > 2) {
-    //   return;
-    // }
-
-    if (this.readCount > 1) {
-      // eval('debugger');
-    }
+    // SAMPLE_RATE = (data.length * (1000 / this.timing)) | 0;
 
     if (data.filter(Boolean).length === 0) {
       return;
     }
 
-    console.log('read: %s', this.pulseBufferPtr);
-
     let pulse = null;
-    while ((pulse = this.readPulse(data))) {
-      this.readPilot(pulse);
+    while ((pulse = this.readPulse())) {
+      this.readByte(pulse);
+      this.readData();
+      this.readHeader();
       this.readSyn(pulse);
+      this.readPilot(pulse);
       this.update();
-      this.state.pulses.push(pulse);
+      // this.state.pulses.push(pulse);
     }
   }
 
-  readPulse(buffer) {
+  readPulse() {
+    const buffer = this._data;
     const length = buffer.length;
 
     if (!length) {
       return null;
     }
-
-    let previously = this.pulseBufferPtr;
 
     let last =
       this.pulseBufferPtr > 0 ? this.pulseBuffer[this.pulseBufferPtr] : null;
@@ -138,32 +133,17 @@ export default class ROMLoader {
     for (; this.edgePtr < length; this.edgePtr++) {
       let point = buffer[this.edgePtr];
 
-      if (previously) {
-        console.log(
-          '%s: %s (last %s), edge? %s',
-          this.state.pulses.length,
-          point,
-          last,
-          isEdge(point, last),
-          this.pulseBufferPtr
-        );
-        previously = false;
-      }
-
       // search for when the buffer point crosses the zero threshold
       if (last !== null) {
         if (point === 0) {
           continue;
         }
 
-        if (!previously && isEdge(point, last)) {
+        if (isEdge(point, last)) {
           // important: when we hit an edge, the data doesn't include the edge
           // itself as determined by the use of `i` rather than edgePtr
-          const pulse = this.pulseBufferPtr; // this.pulseBuffer.subarray(1, this.pulseBufferPtr - 1);
+          const pulse = this.pulseBufferPtr;
 
-          // if (pulse === 1) {
-          console.log('edge found: %s', pulse);
-          // }
           this.pulseBufferPtr = 0;
           this.edgeCounter++;
           return pulse;
@@ -175,40 +155,96 @@ export default class ROMLoader {
       this.pulseBufferPtr++;
     }
 
-    // const pulse = this.pulseBufferPtr;
-    this.pulseBufferPtr--; // back up one point
-    // this.edgeCounter++;
-
-    // return pulse;
+    this.pulseBufferPtr--; // back up by one point
 
     return null; // no edge found
   }
 
-  readHeader(pulse) {}
+  readHeader() {
+    const state = this.state;
+    if (state.synOff === true && state.header === false) {
+      if (this.bytesPtr === 18) {
+        const bytes = this.bytesBuffer.slice(0, 18);
 
-  readByte(high) {
-    const bytes = new Uint8Array(length); // FIXME move to readHeader
+        const parity = calculateXORChecksum(bytes.slice(0, -1));
 
-    for (let i = 0; i < length * 8; i++) {
-      // const [high, low] = loadEdge2(buffer, false);
+        if (parity !== bytes[bytes.length - 1]) {
+          console.error(
+            'R Tape Loading Error',
+            parity,
+            bytes[bytes.length - 1]
+          );
+          return null;
+        }
 
-      if (!high || !low) {
-        console.log('bad byte - missing pair of pulses @ %s', i, high, low);
-        return;
+        console.log('HEADER: OK');
+
+        const filename = decode(bytes.slice(1, 10)); // filename is in position 1…11
+        const length = (bytes[11] << 8) + bytes[12]; // length is held in 2 bytes
+
+        this.state.header = { filename, length };
+        console.log('%s: %s bytes', filename, length);
+
+        // reset the position of the byteBuffer
+        this.bytesPtr = 0;
       }
+    }
+  }
 
-      // we're collecting the bits for an array of 8 bit bytes,
-      // first left shifting by 1 bit, then adding the new bit
-      // until we have a full byte
-      const waveLength = round(1 / SAMPLE_RATE * (high.length + low.length), 3);
-      const p = (i / 8) | 0;
-      bytes[p] <<= 1; // left shift
-      bytes[p] += waveLength === oneLength ? 0b1 : 0b0;
+  readByte(pulse) {
+    if (this.state.synOff === false) {
+      return;
     }
 
-    console.log(bytes);
+    const bitPair = this.bitPair;
+    bitPair.push(pulse);
 
-    return bytes;
+    if (bitPair.length < 2) {
+      return;
+    }
+
+    const [high, low] = bitPair;
+
+    const h = (high / 10) | 0;
+    const l = (low / 10) | 0;
+
+    if (h !== l) {
+      console.error('😟 bad pair', high, low);
+      bitPair.shift();
+      return;
+    }
+    this.bitPair = [];
+
+    // we're collecting the bits for an array of 8 bit bytes,
+    // first left shifting by 1 bit, then adding the new bit
+    // until we have a full byte
+    const waveLength = round(1 / SAMPLE_RATE * (high + low), 3);
+    this.byteBuffer[0] <<= 1; // left shift
+    this.byteBuffer[0] += waveLength === oneLength ? 0b1 : 0b0;
+
+    this.bytePtr++;
+
+    if (this.bytePtr === 8) {
+      // move to the bytesBuffer
+      this.bytesBuffer[this.bytesPtr] = this.byteBuffer[0];
+      this.bytesPtr++;
+      this.bytePtr = 0;
+    }
+  }
+
+  readData() {
+    if (this.state.header && !this.state.data) {
+      if (this.bytesPtr === this.state.header.length - 1) {
+        const bytes = (this.state.data = this.bytesBuffer.slice(
+          0,
+          this.bytesPtr
+        ));
+        const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
+        const url = URL.createObjectURL(blob);
+
+        this.img.src = url;
+      }
+    }
   }
 
   readPilot(pulse) {
@@ -218,24 +254,12 @@ export default class ROMLoader {
       const length = round(1 / SAMPLE_RATE * pulse);
       if (length !== pilotLength) {
         if (length < pilotLength) {
-          // edgePtr -= pulse;
-          console.log(
-            'bad pulse (%s) %s !== %s @ %s',
-            pulse,
-            length,
-            pilotLength,
-            this.state.pulses.length
-          );
-
           this.state.bad.push({
             length,
             pulse,
             i: this.state.pulses.length,
             ptr: this.pulseBufferPtr,
           });
-
-          // this.edgeCounter -= pulse;
-          // this.pulseBufferPtr += pulse;
         } else {
           console.log('failed pilot was longer');
         }
@@ -244,7 +268,7 @@ export default class ROMLoader {
       }
       state.pilot++;
 
-      if (state.pilot === 8063) {
+      if (state.pilot === PILOT_COUNT) {
         state.pilot = true;
         console.log('PILOT: OK');
       }
