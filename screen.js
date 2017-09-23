@@ -19,9 +19,9 @@ async function main() {
   document.body.appendChild(img);
 
   rom.handlers.bytes = bytes => {
-    // const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
-    // const url = URL.createObjectURL(blob);
-    // img.src = url;
+    const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
+    const url = URL.createObjectURL(blob);
+    img.src = url;
   };
 
   rom.handlers.end = () => {

@@ -86,6 +86,9 @@ export default class ROMLoader {
   update() {
     window.requestAnimationFrame(() => {
       this.handlers.update(this);
+      if (this.state.data.length) {
+        this.handlers.bytes(this.state.data);
+      }
     });
   }
 
@@ -235,14 +238,7 @@ export default class ROMLoader {
   readData() {
     if (this.state.header && !this.state.data) {
       if (this.bytesPtr === this.state.header.length - 1) {
-        const bytes = (this.state.data = this.bytesBuffer.slice(
-          0,
-          this.bytesPtr
-        ));
-        const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
-        const url = URL.createObjectURL(blob);
-
-        this.img.src = url;
+        this.state.data = this.bytesBuffer.slice(0, this.bytesPtr);
       }
     }
   }
