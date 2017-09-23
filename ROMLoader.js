@@ -64,6 +64,7 @@ export default class ROMLoader {
       synOff: false,
       header: false,
       data: false,
+      complete: false,
       bad: [],
       pulses: [],
     };
@@ -87,7 +88,7 @@ export default class ROMLoader {
     window.requestAnimationFrame(() => {
       this.handlers.update(this);
       if (this.state.data.length) {
-        this.handlers.bytes(this.state.data);
+        this.handlers.bytes(this.state.data, this.state.header);
       }
     });
   }
@@ -236,9 +237,14 @@ export default class ROMLoader {
   }
 
   readData() {
-    if (this.state.header && !this.state.data) {
-      if (this.bytesPtr === this.state.header.length - 1) {
-        this.state.data = this.bytesBuffer.slice(0, this.bytesPtr);
+    if (this.state.header && !this.state.complete) {
+      const fin = this.bytesPtr === this.state.header.length - 1;
+
+      this.state.data = this.bytesBuffer.slice(0, this.bytesPtr);
+
+      if (fin) {
+        this.state.complete = true;
+        this.handlers.end();
       }
     }
   }

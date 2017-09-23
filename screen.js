@@ -18,15 +18,25 @@ async function main() {
   const img = new Image();
   document.body.appendChild(img);
 
+  let prevLength = 0;
   rom.handlers.bytes = bytes => {
-    const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
-    const url = URL.createObjectURL(blob);
-    img.src = url;
+    if (bytes.length !== prevLength) {
+      prevLength = bytes.length;
+      console.log('paint');
+      const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
+      const url = URL.createObjectURL(blob);
+      img.src = url;
+    }
   };
 
   rom.handlers.end = () => {
     console.log('stopping');
     canvas.stop();
+    const blob = new Blob([rom.state.data], {
+      type: 'application/octet-binary',
+    }); // pass a useful mime type here
+    const url = URL.createObjectURL(blob);
+    img.src = url;
   };
 
   rom.handlers.update = () => {

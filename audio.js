@@ -21,7 +21,7 @@ const LOW = -0.15;
 
 // pulse lengths defined by ZX ROM documentation
 export const PILOT = 2168;
-export const PILOT_COUNT = 8063;
+export const PILOT_COUNT = 63;
 export const ZERO = 855;
 export const ONE = 2 * ZERO;
 export const SYN_ON = 667;
