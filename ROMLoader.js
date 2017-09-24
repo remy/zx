@@ -35,9 +35,6 @@ export default class ROMLoader {
     this.lastCall = null;
     this.timing = 0;
 
-    const img = (this.img = new Image());
-    document.body.appendChild(img);
-
     this.node = ctx.createScriptProcessor(bufferSize, 1, 1);
     this.node.onaudioprocess = audioProcessingEvent => {
       const channel = 0;
@@ -69,6 +66,8 @@ export default class ROMLoader {
       pulses: [],
     };
 
+    this.queue = [];
+
     this.handlers = {
       pilot: [],
       syn: [],
@@ -87,6 +86,14 @@ export default class ROMLoader {
   update() {
     window.requestAnimationFrame(() => {
       this.handlers.update(this);
+      if (this.queue.length) {
+        let event = null;
+        while ((event = this.queue.shift())) {
+          if (this.handlers[event.type]) {
+            this.handlers[event.type](event.value);
+          }
+        }
+      }
       if (this.state.data.length) {
         this.handlers.bytes(this.state.data, this.state.header);
       }
@@ -223,14 +230,18 @@ export default class ROMLoader {
     // first left shifting by 1 bit, then adding the new bit
     // until we have a full byte
     const waveLength = round(1 / SAMPLE_RATE * (high + low), 3);
+    const bit = waveLength === oneLength ? 0b1 : 0b0;
     this.byteBuffer[0] <<= 1; // left shift
-    this.byteBuffer[0] += waveLength === oneLength ? 0b1 : 0b0;
+    this.byteBuffer[0] += bit;
+
+    this.queue.push({ type: 'bit', value: bit });
 
     this.bytePtr++;
 
     if (this.bytePtr === 8) {
       // move to the bytesBuffer
-      this.bytesBuffer[this.bytesPtr] = this.byteBuffer[0];
+      const byte = (this.bytesBuffer[this.bytesPtr] = this.byteBuffer[0]);
+      this.queue.push({ type: 'byte', value: byte });
       this.bytesPtr++;
       this.bytePtr = 0;
     }
@@ -283,17 +294,17 @@ export default class ROMLoader {
       return;
     }
 
-    if (state.synOn === false) {
-      state.synOn = this.expectPulse(pulse, SYN_ON);
-      if (state.synOn) {
-        console.log('SYN_ON: OK');
-      }
-    }
-
     if (state.synOff === false) {
       state.synOff = this.expectPulse(pulse, SYN_OFF);
       if (state.synOff) {
         console.log('SYN_OFF: OK');
+      }
+    }
+
+    if (state.synOn === false) {
+      state.synOn = this.expectPulse(pulse, SYN_ON);
+      if (state.synOn) {
+        console.log('SYN_ON: OK');
       }
     }
   }

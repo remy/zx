@@ -1,4 +1,44 @@
-<img src="cfp-people.gif" hidden>
+<style>
+  canvas {
+    z-index: -10;
+  }
+
+  .pilot {
+    border-color: cyan;
+  }
+
+  .bit0 {
+    border-color: blue;
+  }
+
+  .bit1 {
+    border-color: yellow;
+  }
+
+  pre {
+    display: inline-block;
+    background: white;
+    padding: 10px;
+    margin: 0;
+  }
+
+  img[hidden] {
+    display: none;
+  }
+
+  img {
+    /* border: 50px solid white; */
+    z-index: -1;
+    image-rendering: pixelated;
+    width: calc(192px * 3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+  }
+</style>
+<img src="me.png" hidden>
+<img src="cfp-people-min.png" hidden>
 <img src="8x8-heart.png" hidden>
 <script type="text/html" id="index">
   <link rel="stylesheet" href="styles.css">
