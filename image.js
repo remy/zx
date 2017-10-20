@@ -32,8 +32,6 @@ function crop(
   return { x, y, width, height };
 }
 
-console.log(crop({ width: 500, height: 500 }, { width: 256, height: 192 }));
-
 export function imageToCanvas(
   img,
   scale = { width: img.width, height: img.height }

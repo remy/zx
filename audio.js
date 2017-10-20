@@ -245,6 +245,17 @@ export default class Audio {
     this.src.buffer = buffer;
   }
 
+  async loadFromURL(url) {
+    const res = await fetch(url);
+    const binary = await res.arrayBuffer();
+    const buffer = generateHeader(
+      ctx,
+      url.split('/').pop(),
+      new Uint8Array(binary)
+    );
+    this.src.buffer = buffer;
+  }
+
   start() {
     this.gain.connect(ctx.destination);
     this.src.start();

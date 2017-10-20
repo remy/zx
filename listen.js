@@ -31,7 +31,9 @@ function start() {
       },
     },
     stream => {
-      main(ctx.createMediaStreamSource(stream));
+      const audio = ctx.createMediaStreamSource(stream);
+      audio.connect(ctx.destination);
+      main(audio);
     },
     err => console.error(err)
   );

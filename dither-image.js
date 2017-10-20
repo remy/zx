@@ -1,6 +1,6 @@
 import Dither from './Dither.js';
 import { imageToCanvas, imageToBlob } from './image.js';
-import { pixelsForSCR } from '../image-manip/scr.js';
+import { pixelsForSCR } from './image-manip/scr.js';
 
 const colorMap = [
   [0, 0, 0xff],
@@ -203,7 +203,7 @@ async function main() {
 
       attribute += ink;
       attribute += paper << 3;
-      pixels[2048 * 3 + ptr] = attribute;
+      pixels[2048 * 3 + ptr] = 0b01111000; // attribute;
 
       ptr++;
     }

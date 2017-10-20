@@ -1,17 +1,18 @@
 import Audio from './audio.js';
 import ROMLoader from './ROMLoader.js';
-// import canvas from './canvas.js';
+import canvas from './canvas.js';
 import Bars from './bars.js';
 
 async function main() {
   const bars = new Bars();
   bars.pilot();
   const audio = (window.audio = new Audio());
-  await audio.load(document.querySelector('img'));
+  // await audio.load(document.querySelector('img'));
+  await audio.loadFromURL('./image-manip/midnight.scr');
   audio.volume = 100;
   const rom = (window.rom = new ROMLoader());
   rom.connect(audio);
-  // canvas.connect(audio.node);
+  canvas.connect(audio.node);
 
   document.documentElement.onkeydown = e => {
     if (e.which === 27) {
