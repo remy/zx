@@ -1,13 +1,13 @@
 import Audio from './audio.js';
-import ROMLoader from './ROMLoader.js';
+// import ROMLoader from './ROMLoader.js';
 import canvas from './canvas.js';
 
 async function main() {
   const audio = (window.audio = new Audio());
   await audio.load(document.querySelector('img'));
   audio.volume = 100;
-  const rom = (window.rom = new ROMLoader());
-  rom.connect(audio);
+  // const rom = (window.rom = new ROMLoader());
+  // rom.connect(audio);
   canvas.connect(audio.node);
 
   const img = new Image();
@@ -20,16 +20,16 @@ async function main() {
     }
   };
 
-  rom.handlers.end = () => {
-    console.log('finished');
-    // canvas.stop();
-    audio.stop();
-    const blob = new Blob([rom.state.data], {
-      type: 'application/octet-binary',
-    });
-    const url = URL.createObjectURL(blob);
-    img.src = url;
-  };
+  // rom.handlers.end = () => {
+  //   console.log('finished');
+  //   // canvas.stop();
+  //   audio.stop();
+  //   const blob = new Blob([rom.state.data], {
+  //     type: 'application/octet-binary',
+  //   });
+  //   const url = URL.createObjectURL(blob);
+  //   img.src = url;
+  // };
 
   setTimeout(() => audio.start(), 0);
 }
