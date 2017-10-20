@@ -24,8 +24,10 @@ function start() {
           googNoiseSuppression: false,
           googHighpassFilter: false,
           echoCancellation: false,
+          googAutoGainControl2: false,
+          googTypingNoiseDetection: false,
         },
-        optional: [],
+        optional: [{ echoCancellation: false }],
       },
     },
     stream => {

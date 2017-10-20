@@ -47,7 +47,7 @@ export function generateFlatSamples({ output, i, pulse, value = HIGH }) {
   i = (i + 0.5) | 0;
   pulse = (i + pulse + 0.5) | 0;
   for (; i < pulse; i++) {
-    const noise = Math.random() * 0.01 * (value < 0 ? -1 : 1);
+    const noise = 0; //Math.random() * 0.01 * (value < 0 ? -1 : 1);
     output[i] = value + noise;
   }
 
@@ -62,7 +62,7 @@ export function generateSamplesForRange({ output, i, pulse, length = pulse }) {
   for (; i < length; i++) {
     const sampleTime = i / SAMPLE_RATE;
     const sampleAngle = sampleTime * freq;
-    const noise = Math.random() * 0.01;
+    const noise = 0; //Math.random() * 0.01;
     output[i] = Math.sin(sampleAngle) < 0 ? LOW - noise : HIGH + noise;
   }
 }
