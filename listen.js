@@ -1,22 +1,54 @@
+import ctx from './ctx.js';
 import Audio from './audio.js';
 import ROMLoader from './ROMLoader.js';
-// import canvas from './canvas.js';
+import canvas from './canvas.js';
 import Bars from './bars.js';
 
-async function main() {
+let started = false;
+// document.body.onclick = start;
+start();
+
+function start() {
+  if (started) return;
+  started = true;
+  navigator.getUserMedia =
+    navigator.getUserMedia ||
+    navigator.webkitGetUserMedia ||
+    navigator.mozGetUserMedia;
+  navigator.getUserMedia(
+    {
+      audio: {
+        mandatory: {
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false,
+          echoCancellation: false,
+        },
+        optional: [],
+      },
+    },
+    stream => {
+      main(ctx.createMediaStreamSource(stream));
+    },
+    err => console.error(err)
+  );
+}
+
+async function main(audio) {
   const bars = new Bars();
-  bars.pilot();
-  const audio = (window.audio = new Audio());
-  await audio.load(document.querySelector('img'));
-  audio.volume = 100;
   const rom = (window.rom = new ROMLoader());
-  rom.connect(audio);
-  // canvas.connect(audio.node);
+  const gain = ctx.createGain();
+  gain.connect(ctx.destination);
+  gain.gain.setTargetAtTime(0, ctx.currentTime, 0); // mute
+  rom.connect({ node: audio, gain });
+  canvas.connect(audio);
+  rom.node.connect(gain);
 
   document.documentElement.onkeydown = e => {
     if (e.which === 27) {
-      // canvas.stop();
-      audio.stop();
+      canvas.stop();
+      rom.stop();
     }
   };
 
@@ -28,13 +60,8 @@ async function main() {
   const img = new Image();
   document.body.appendChild(img);
 
-  // rom.handlers.bit = bit => {
-  //   img.className = `bit${bit}`;
-  // };
-
   let prevLength = 0;
   let newBytes = new Uint8Array(0); // updated as this type later
-  let lastURL = null;
   rom.handlers.bytes = bytes => {
     if (bytes.length !== prevLength) {
       newBytes = bytes.slice(prevLength);
@@ -43,22 +70,13 @@ async function main() {
       const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
       const url = URL.createObjectURL(blob);
       img.src = url;
-      img.className = 'styled';
-      if (lastURL) {
-        URL.revokeObjectURL(lastURL);
-      }
-      lastURL = url;
     }
-  };
-
-  rom.handlers.pilot = () => {
-    bars.pilotDone();
   };
 
   rom.handlers.end = () => {
     console.log('finished');
-    // canvas.stop();
-    audio.stop();
+    canvas.stop();
+    // audio.stop();
     const blob = new Blob([rom.state.data], {
       type: 'application/octet-binary',
     });
@@ -66,12 +84,7 @@ async function main() {
     img.src = url;
   };
 
-  let pilot = 170;
   rom.handlers.update = () => {
-    if (rom.state.pilot !== true && rom.state.pilot > 1500) {
-      pilot ^= 0xff;
-      bars.draw(new Uint8Array(Array.from({ length: 4 }, () => pilot)));
-    }
     const progress = rom.state.data ? rom.state.data.length : 0;
     const length = rom.state.header ? rom.state.header.length - 1 : 0;
     pre.innerHTML = `edgePtr: ${rom.edgePtr}
@@ -96,7 +109,7 @@ FILE: ${rom.state.header ? rom.state.header.filename : '???'}
 BYTES: ${progress || '?'}/${length || '?'} / ${(progress / length * 100) | 0}%`;
   };
 
-  setTimeout(() => audio.start(), 0);
+  // setTimeout(() => audio.start(), 0);
 }
 
-main();
+// main();

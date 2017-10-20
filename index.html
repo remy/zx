@@ -1,4 +1,8 @@
 <style>
+  body {
+    margin: 0;
+  }
+
   canvas {
     z-index: -10;
   }
@@ -20,26 +24,58 @@
     background: white;
     padding: 10px;
     margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 45vw;
+  }
+
+  * {
+    font-family: monospace;
+  }
+
+  ul {
+    font-size: 3rem;
   }
 
   img[hidden] {
     display: none;
   }
 
+  canvas,
   img {
+    image-rendering: optimizeSpeed;
+    /* Older versions of FF          */
+    image-rendering: -moz-crisp-edges;
+    /* FF 6.0+                       */
+    image-rendering: -webkit-optimize-contrast;
+    /* Safari                        */
+    image-rendering: -o-crisp-edges;
+    /* OS X & Windows Opera (12.02+) */
+    image-rendering: pixelated;
+    /* Awesome future-browsers       */
+    -ms-interpolation-mode: nearest-neighbor;
+    /* IE                            */
+  }
+
+  img.styled {
     /* border: 50px solid white; */
     z-index: -1;
     image-rendering: pixelated;
-    width: calc(192px * 3);
-    display: flex;
+    width: calc(256px * 1);
+    position: absolute;
+    top: 24px;
+    left: 32px;
+    /* display: flex; */
     align-items: center;
     justify-content: center;
     margin: 0 auto;
+    background: #d7d7d7;
   }
 </style>
-<img src="me.png" hidden>
+<img src="me-int.gif" hidden>
+<img src="rem.jpg" id="rem" hidden>
+<img id="heart" src="8x8-heart.png" hidden>
 <img src="cfp-people-min.png" hidden>
-<img src="8x8-heart.png" hidden>
 <script type="text/html" id="index">
   <link rel="stylesheet" href="styles.css">
   <ul>
@@ -49,11 +85,15 @@
     <li><a href="?4-binary">4-binary</a></li>
     <li><a href="?5-convert">5-convert</a></li>
     <li><a href="?6-image">6-image</a></li>
-    <li><a href="?7-bars">7-bars</a></li>
-    <li><a href="?8-bars-cheat">8-bars-cheat</a></li>
-    <li><a href="?rom-loader">rom-loader</a></li>
+    <!-- <li><a href="?7-bars">7-bars</a></li> -->
+    <!-- <li><a href="?8-bars-cheat">8-bars-cheat</a></li> -->
+    <!-- <li><a href="?rom-loader">rom-loader</a></li> -->
+    <li><a href="?rom-loader2">rom-loader</a></li>
     <li><a href="?t-state">t-state</a></li>
     <li><a href="?screen">screen</a></li>
+    <li><a href="?sound-only">sound only</a></li>
+    <li><a href="?listen">listen (fail!)</a></li>
+    <li><a href="?dither-image">dither</a></li>
   </ul>
 </script>
 <script>

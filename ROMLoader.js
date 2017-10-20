@@ -35,6 +35,8 @@ export default class ROMLoader {
     this.lastCall = null;
     this.timing = 0;
 
+    this.updateTimer = null;
+
     this.node = ctx.createScriptProcessor(bufferSize, 1, 1);
     this.node.onaudioprocess = audioProcessingEvent => {
       const channel = 0;
@@ -69,23 +71,43 @@ export default class ROMLoader {
     this.queue = [];
 
     this.handlers = {
-      pilot: [],
+      pilot: () => {},
       syn: [],
       header: [],
-      bytes: [],
-      end: [],
+      bytes: () => {},
+      bit: () => {},
+      end: () => {},
+      update: () => {},
     };
+  }
+
+  decode(bytes) {
+    return decode(bytes);
   }
 
   connect(target) {
     target.node.connect(this.node);
-    this.node.connect(target.gain);
+    if (target.gain) {
+      this.node.connect(target.gain);
+    }
     this.lastCall = window.performance.now();
   }
 
+  stop() {
+    this.node.disconnect();
+  }
+
+  fromBuffer(buffer) {
+    this.read(buffer, performance.now());
+  }
+
   update() {
-    window.requestAnimationFrame(() => {
+    window.cancelAnimationFrame(this.updateTimer);
+    this.updateTimer = window.requestAnimationFrame(() => {
       this.handlers.update(this);
+      if (this.state.data.length) {
+        this.handlers.bytes(this.state.data, this.state.header);
+      }
       if (this.queue.length) {
         let event = null;
         while ((event = this.queue.shift())) {
@@ -93,9 +115,6 @@ export default class ROMLoader {
             this.handlers[event.type](event.value);
           }
         }
-      }
-      if (this.state.data.length) {
-        this.handlers.bytes(this.state.data, this.state.header);
       }
     });
   }
@@ -114,9 +133,9 @@ export default class ROMLoader {
 
     // SAMPLE_RATE = (data.length * (1000 / this.timing)) | 0;
 
-    if (data.filter(Boolean).length === 0) {
-      return;
-    }
+    // if (data.filter(Boolean).length === 0) {
+    //   return;
+    // }
 
     let pulse = null;
     while ((pulse = this.readPulse())) {
@@ -125,14 +144,18 @@ export default class ROMLoader {
       this.readHeader();
       this.readSyn(pulse);
       this.readPilot(pulse);
-      this.update();
       // this.state.pulses.push(pulse);
     }
+    this.update();
   }
 
   readPulse() {
     const buffer = this._data;
     const length = buffer.length;
+
+    if (this.state.complete) {
+      return null;
+    }
 
     if (!length) {
       return null;
@@ -140,6 +163,8 @@ export default class ROMLoader {
 
     let last =
       this.pulseBufferPtr > 0 ? this.pulseBuffer[this.pulseBufferPtr] : null;
+
+    const limit = 0.0006; // used when reading from mic
 
     for (; this.edgePtr < length; this.edgePtr++) {
       let point = buffer[this.edgePtr];
@@ -150,6 +175,9 @@ export default class ROMLoader {
           continue;
         }
 
+        if (point > limit * -1 && point < limit) {
+          continue;
+        }
         if (isEdge(point, last)) {
           // important: when we hit an edge, the data doesn't include the edge
           // itself as determined by the use of `i` rather than edgePtr
@@ -234,14 +262,14 @@ export default class ROMLoader {
     this.byteBuffer[0] <<= 1; // left shift
     this.byteBuffer[0] += bit;
 
-    this.queue.push({ type: 'bit', value: bit });
+    // this.queue.push({ type: 'bit', value: bit });
 
     this.bytePtr++;
 
     if (this.bytePtr === 8) {
       // move to the bytesBuffer
-      const byte = (this.bytesBuffer[this.bytesPtr] = this.byteBuffer[0]);
-      this.queue.push({ type: 'byte', value: byte });
+      this.bytesBuffer[this.bytesPtr] = this.byteBuffer[0];
+      // this.queue.push({ type: 'byte', value: byte });
       this.bytesPtr++;
       this.bytePtr = 0;
     }
@@ -255,6 +283,7 @@ export default class ROMLoader {
 
       if (fin) {
         this.state.complete = true;
+        this.stop();
         this.handlers.end();
       }
     }
@@ -284,6 +313,7 @@ export default class ROMLoader {
       if (state.pilot === PILOT_COUNT) {
         state.pilot = true;
         console.log('PILOT: OK');
+        this.queue.push({ type: 'pilot', value: true });
       }
     }
   }
@@ -320,9 +350,10 @@ export default class ROMLoader {
 
   on(event, handler) {
     if (!this.handlers[event]) {
-      throw new Error(`unknown event ${event}`);
+      throw new Error(`unknown event handler ${event}`);
     }
 
-    this.handlers[event].push(handler);
+    console.log('binding %s', event);
+    this.handlers[event] = handler;
   }
 }

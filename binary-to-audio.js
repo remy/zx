@@ -28,4 +28,5 @@ export default function main(binary) {
 
   // visualise the data
   canvas.connect(src);
+  return output;
 }

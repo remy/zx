@@ -12,7 +12,7 @@ export const T = 1 / 3500000; // pulse width (half a wave cycle) in ms @ 3.5Mhz
  */
 
 export const asHz = pulse => 1 / (T * pulse);
-// const toAngularFrequency = hz => hz * 2 * Math.PI;
+export const toAngularFrequency = hz => hz * 2 * Math.PI;
 
 // these are how high and low the pulse value goes in the audio buffer
 // 1 and -1 being the extreme max
@@ -54,18 +54,18 @@ export function generateFlatSamples({ output, i, pulse, value = HIGH }) {
   return pulse;
 }
 
-// function generateSamplesForRange({ output, i, pulse, length = pulse }) {
-//   length = length * T * SAMPLE_RATE;
-//   const freq = toAngularFrequency(asHz(pulse));
-//   i = (i + 0.5) | 0; // round the i value
-//   length = (i + length + 0.5) | 0;
-//   for (; i < length; i++) {
-//     const sampleTime = i / SAMPLE_RATE;
-//     const sampleAngle = sampleTime * freq;
-//     const noise = Math.random() * 0.01;
-//     output[i] = Math.sin(sampleAngle) < 0 ? LOW - noise : HIGH + noise;
-//   }
-// }
+export function generateSamplesForRange({ output, i, pulse, length = pulse }) {
+  length = length * T * SAMPLE_RATE;
+  const freq = toAngularFrequency(asHz(pulse));
+  i = (i + 0.5) | 0; // round the i value
+  length = (i + length + 0.5) | 0;
+  for (; i < length; i++) {
+    const sampleTime = i / SAMPLE_RATE;
+    const sampleAngle = sampleTime * freq;
+    const noise = Math.random() * 0.01;
+    output[i] = Math.sin(sampleAngle) < 0 ? LOW - noise : HIGH + noise;
+  }
+}
 
 function generateBit(pulse) {
   const output = new Float32Array((pulse * 2 * T * SAMPLE_RATE + 0.5) | 0);
@@ -106,7 +106,7 @@ function generatePilot(output, count = PILOT_COUNT) {
   return offset;
 }
 
-function generateBytes({ offset = 0, data, output }) {
+export function generateBytes({ offset = 0, data, output }) {
   for (let j = 0; j < data.length; j++) {
     const pulse = data[j];
     for (let i = 0; i < 8; i++) {
@@ -265,7 +265,8 @@ export default class Audio {
   set volume(volume) {
     this[_volume] = volume;
     const f = volume / 100;
-    this.gain.gain.value = f * f;
+    this.gain.gain.setTargetAtTime(f * f, ctx.currentTime, 0);
+    // this.gain.gain.value = f * f;
   }
 }
 

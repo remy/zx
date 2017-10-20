@@ -44,8 +44,6 @@ function loadBytes(length, buffer) {
 
   const bytes = new Uint8Array(length);
 
-  let byte = '';
-
   for (let i = 0; i < length * 8; i++) {
     const [high, low] = loadEdge2(buffer, false);
 
@@ -61,20 +59,6 @@ function loadBytes(length, buffer) {
     const p = (i / 8) | 0;
     bytes[p] <<= 1; // left shift
     bytes[p] += waveLength === oneLength ? 0b1 : 0b0;
-
-    if (i % 8 === 0) {
-      byte = '';
-    }
-    byte += waveLength === oneLength ? '1' : '0';
-    // console.log(
-    //   'bit: %s',
-    //   waveLength === zeroLength ? 0b0 : 0b1,
-    //   i % 8,
-    //   p,
-    //   byte,
-    //   bytes[p].toString(2).padStart(8, '0'),
-    //   bytes[p]
-    // );
   }
 
   console.log(bytes);

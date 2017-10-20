@@ -42,7 +42,9 @@ function fileToBinary(file) {
   });
 }
 
-const elm = document.querySelector('img');
+document.body.appendChild(document.createElement('ul'));
+
+const elm = document.querySelector('#heart');
 const out = document.querySelector('ul');
 const log = t => (out.innerHTML += `<li>${t}</li>`);
 
@@ -53,5 +55,7 @@ imageToBlob(elm)
   })
   .then(binary => {
     log(`${binary.length} bits loaded`);
-    toAudio(binary);
+    return toAudio(binary);
+  }).then(audio => {
+    log(`${audio.length} samples`);
   });
