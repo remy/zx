@@ -102,7 +102,7 @@ async function sleep(ms) {
 
 async function put(ctx, imageData, x, y) {
   ctx.putImageData(imageData, x, y);
-  await sleep(0);
+  await sleep(1);
 }
 
 async function draw(ctx, third, data) {
@@ -134,6 +134,41 @@ async function draw(ctx, third, data) {
   }
 }
 
+export async function stream(ctx, byte, index) {
+  const third = index >> 11; // 0..2047, 2048..4095, 4096..6143
+
+  if (third === 3) {
+    const attribs = readAttributes(byte);
+    const x = (index % 32) * 8;
+    const y = ((index >> 5) % 64) * 8;
+
+    const block = ctx.getImageData(x, y, 8, 8);
+    for (let i = 0; i < 8 * 8; i++) {
+      const type = block.data[i * 4] === 255 ? 'ink' : 'paper';
+      block.data.set(attribs[type], i * 4);
+    }
+
+    await put(ctx, block, x, y);
+
+    return;
+  }
+
+  const imageData = new Uint8ClampedArray(4 * 8); // 1x8 pixel array
+
+  // build the line based on the 8bit byte
+  for (let j = 0; j < 8; j++) {
+    // determines bit for i, based on MSb
+    const bit = (byte & (1 << (7 - j))) === 0 ? 0 : 255;
+    imageData.set([bit, bit, bit, 255], j * 4);
+  }
+
+  const x = index % 32;
+  const y = ((index >> 5) * 8) % 64 + third * 56; // this is the y coord
+  const offset = index >> 8;
+
+  await put(ctx, new ImageData(imageData, 8, 1), x * 8, y + offset);
+}
+
 export function pixelsForSCR(buffer, ctx) {
   const w = 256;
   const h = 192;
@@ -142,12 +177,6 @@ export function pixelsForSCR(buffer, ctx) {
     for (let x = 0; x < w / 8; x++) {
       const pixel = block(x, y, buffer); // returns 8x8
       ctx.putImageData(new ImageData(pixel, 8, 8), x * 8, y * 8);
-      // for (let row = 0; row < 8; row++) {
-      //   pixels.set(
-      //     pixel.subarray(row * 8 * 4, row * 8 * 4 + 8 * 4),
-      //     (y * row * w + x * row * 8) * 4
-      //   ); // (191 * 256 + 255) * 4 = 196,604
-      // }
     }
   }
 
@@ -197,7 +226,7 @@ function doBlink(ctx, buffer) {
 }
 
 export default async function main() {
-  const buffer = await load('./image.scr');
+  const buffer = await load('./midnight.scr');
 
   const canvas = document.createElement('canvas');
   const log = document.createElement('pre');
@@ -209,7 +238,7 @@ export default async function main() {
 
   window.ctx = ctx;
 
-  const scale = 3;
+  const scale = 2;
   const w = (canvas.width = 256);
   const h = (canvas.height = 192);
   canvas.style.imageRendering = 'pixelated';
@@ -224,7 +253,7 @@ export default async function main() {
 
   const attribs = buffer.subarray(2048 * 3);
 
-  // await colour(ctx, buffer);
+  await colour(ctx, buffer);
   zoom.seeXY(0, 0);
 
   // setInterval(() => zoom.seeXY(), 1000);

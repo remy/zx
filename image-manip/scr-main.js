@@ -1,8 +1,8 @@
-import { load, pixelsForSCR } from './scr.js';
+import main, { load, pixelsForSCR } from './scr.js';
 
 // main();
 
-async function main() {
+async function simple() {
   const buffer = await load('./midnight.scr');
 
   const canvas = document.createElement('canvas');

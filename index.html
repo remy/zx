@@ -57,11 +57,13 @@
     /* IE                            */
   }
 
-  img.styled {
+  .styled {
     /* border: 50px solid white; */
+    --scale: 1;
     z-index: -1;
     image-rendering: pixelated;
-    width: calc(256px * 1);
+    /* width: calc(256px * 1); */
+    width: calc(256px * var(--scale));
     position: absolute;
     top: 24px;
     left: 32px;
@@ -93,7 +95,9 @@
     <li><a href="?screen">screen</a></li>
     <li><a href="?sound-only">sound only</a></li>
     <li><a href="?listen">listen (fail!)</a></li>
+    <li><a href="?scr-stream">scr stream</a></li>
     <li><a href="?dither-image">dither</a></li>
+    <li><a href="?complete">complete</a></li>
   </ul>
 </script>
 <script>

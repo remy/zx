@@ -2,6 +2,7 @@ import Audio from './audio.js';
 import ROMLoader from './ROMLoader.js';
 import canvas from './canvas.js';
 import Bars from './bars.js';
+import { stream } from './image-manip/scr.js';
 
 async function main() {
   const bars = new Bars();
@@ -26,8 +27,12 @@ async function main() {
   pre.style.position = 'relative';
   pre.style.zIndex = 1;
 
-  const img = new Image();
+  const img = document.createElement('canvas');
+  img.width = 256;
+  img.height = 192;
+  img.className = 'styled';
   document.body.appendChild(img);
+  const imgCtx = img.getContext('2d');
 
   // rom.handlers.bit = bit => {
   //   img.className = `bit${bit}`;
@@ -35,20 +40,21 @@ async function main() {
 
   let prevLength = 0;
   let newBytes = new Uint8Array(0); // updated as this type later
-  let lastURL = null;
+  // let lastURL = null;
   rom.handlers.bytes = bytes => {
     if (bytes.length !== prevLength) {
       newBytes = bytes.slice(prevLength);
       bars.draw(newBytes);
+      newBytes.forEach((byte, i) => stream(imgCtx, byte, prevLength + i));
       prevLength = bytes.length;
-      const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
-      const url = URL.createObjectURL(blob);
-      img.src = url;
-      img.className = 'styled';
-      if (lastURL) {
-        URL.revokeObjectURL(lastURL);
-      }
-      lastURL = url;
+      // const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
+      // const url = URL.createObjectURL(blob);
+      // img.src = url;
+      // img.className = 'styled';
+      // if (lastURL) {
+      //   URL.revokeObjectURL(lastURL);
+      // }
+      // lastURL = url;
     }
   };
 
