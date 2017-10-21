@@ -34,27 +34,15 @@ async function main() {
   document.body.appendChild(img);
   const imgCtx = img.getContext('2d');
 
-  // rom.handlers.bit = bit => {
-  //   img.className = `bit${bit}`;
-  // };
-
   let prevLength = 0;
   let newBytes = new Uint8Array(0); // updated as this type later
-  // let lastURL = null;
+
   rom.handlers.bytes = bytes => {
     if (bytes.length !== prevLength) {
       newBytes = bytes.slice(prevLength);
       bars.draw(newBytes);
       newBytes.forEach((byte, i) => stream(imgCtx, byte, prevLength + i));
       prevLength = bytes.length;
-      // const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
-      // const url = URL.createObjectURL(blob);
-      // img.src = url;
-      // img.className = 'styled';
-      // if (lastURL) {
-      //   URL.revokeObjectURL(lastURL);
-      // }
-      // lastURL = url;
     }
   };
 

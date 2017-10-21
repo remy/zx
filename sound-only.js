@@ -14,6 +14,8 @@ async function main() {
     }
   };
   setTimeout(() => audio.start(), 0);
+
+  document.documentElement.ontouchstart = () => audio.stop();
 }
 
 main();

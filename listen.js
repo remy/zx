@@ -1,33 +1,32 @@
 import ctx from './ctx.js';
-import Audio from './audio.js';
+import { stream } from './image-manip/scr.js';
 import ROMLoader from './ROMLoader.js';
 import canvas from './canvas.js';
 import Bars from './bars.js';
 
 let started = false;
 // document.body.onclick = start;
+
 start();
 
-function start() {
+async function start() {
   if (started) return;
+
+  const devices = await navigator.mediaDevices.enumerateDevices();
+
+  const usb = devices.filter(_ => _.label.includes('USB Audio Device'));
+  let audioSource = null;
+  if (usb.length) {
+    audioSource = usb[0].deviceId;
+    console.log('using usb audio', audioSource);
+  }
+
   started = true;
-  navigator.getUserMedia =
-    navigator.getUserMedia ||
-    navigator.webkitGetUserMedia ||
-    navigator.mozGetUserMedia;
   navigator.getUserMedia(
     {
       audio: {
-        mandatory: {
-          googEchoCancellation: false,
-          googAutoGainControl: false,
-          googNoiseSuppression: false,
-          googHighpassFilter: false,
-          echoCancellation: false,
-          googAutoGainControl2: false,
-          googTypingNoiseDetection: false,
-        },
-        optional: [{ echoCancellation: false }],
+        deviceId: audioSource ? audioSource : undefined,
+        echoCancellation: false,
       },
     },
     stream => {
@@ -61,8 +60,12 @@ async function main(audio) {
   pre.style.position = 'relative';
   pre.style.zIndex = 1;
 
-  const img = new Image();
+  const img = document.createElement('canvas');
+  img.width = 256;
+  img.height = 192;
+  img.className = 'styled';
   document.body.appendChild(img);
+  const imgCtx = img.getContext('2d');
 
   let prevLength = 0;
   let newBytes = new Uint8Array(0); // updated as this type later
@@ -70,10 +73,14 @@ async function main(audio) {
     if (bytes.length !== prevLength) {
       newBytes = bytes.slice(prevLength);
       bars.draw(newBytes);
+
+      newBytes.forEach((byte, i) => stream(imgCtx, byte, prevLength + i));
+
       prevLength = bytes.length;
-      const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
-      const url = URL.createObjectURL(blob);
-      img.src = url;
+
+      // const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
+      // const url = URL.createObjectURL(blob);
+      // img.src = url;
     }
   };
 
