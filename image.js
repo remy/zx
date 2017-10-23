@@ -2,6 +2,18 @@ export default function main(image) {
   return imageToBlob(image).then(fileToBinary);
 }
 
+export function contrast(imageData, contrast = 50) {
+  const data = imageData.data;
+  contrast = contrast / 100 + 1; //convert to decimal & shift range: [0..2]
+  const intercept = 128 * (1 - contrast);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = data[i] * contrast + intercept;
+    data[i + 1] = data[i + 1] * contrast + intercept;
+    data[i + 2] = data[i + 2] * contrast + intercept;
+  }
+  return imageData;
+}
+
 function crop(
   source = { width: 0, height: 0 },
   destination = { width: 0, height: 0 }
@@ -24,9 +36,9 @@ function crop(
   const height = (destination.height * d) | 0;
 
   if (longest === 'height') {
-    x = (source[longest] - width) / 2;
+    x = (source[shortest] - width) / 2;
   } else {
-    y = (source[longest] - height) / 2;
+    y = (source[shortest] - height) / 2;
   }
 
   return { x, y, width, height };

@@ -66,9 +66,13 @@ export default class ROMLoader {
       complete: false,
       bad: [],
       pulses: [],
+      error: ['n/a'],
     };
 
     this.queue = [];
+
+    let errors = 0;
+    const start = Date.now();
 
     this.handlers = {
       pilot: () => {},
@@ -78,6 +82,11 @@ export default class ROMLoader {
       bit: () => {},
       end: () => {},
       update: () => {},
+      error: (...error) => {
+        console.error.apply(console, error);
+        this.state.error = `#${++errors} ${error.join(' ')} :: ${Date.now() -
+          start}ms`;
+      },
     };
   }
 
@@ -124,18 +133,13 @@ export default class ROMLoader {
 
     this._data = data;
 
-    // const data = Float32Array.from(_data);
-
     this.edgePtr = 0;
     this.timing = (callTime - this.lastCall) | 0;
 
     this.lastCall = callTime;
 
-    // SAMPLE_RATE = (data.length * (1000 / this.timing)) | 0;
-
-    // if (data.filter(Boolean).length === 0) {
-    //   return;
-    // }
+    // does nothing: just for my own numbers
+    this.SAMPLE_RATE = (data.length * (1000 / this.timing)) | 0;
 
     let pulse = null;
     while ((pulse = this.readPulse())) {
@@ -144,7 +148,6 @@ export default class ROMLoader {
       this.readHeader();
       this.readSyn(pulse);
       this.readPilot(pulse);
-      // this.state.pulses.push(pulse);
     }
     this.update();
   }
@@ -208,7 +211,12 @@ export default class ROMLoader {
         const parity = calculateXORChecksum(bytes.slice(0, -1));
 
         if (parity !== bytes[bytes.length - 1]) {
-          console.error(
+          // console.error(
+          //   'R Tape Loading Error',
+          //   parity,
+          //   bytes[bytes.length - 1]
+          // );
+          this.handlers.error(
             'R Tape Loading Error',
             parity,
             bytes[bytes.length - 1]
@@ -244,11 +252,28 @@ export default class ROMLoader {
 
     const [high, low] = bitPair;
 
-    const h = (high / 10) | 0;
-    const l = (low / 10) | 0;
+    let h = (high / 10) | 0;
+    let l = (low / 10) | 0;
+
+    // tiny bit of hand massaging. there would be an error on the size of the
+    // pulse, but that would then have a massive knock on effect, so I correct
+    // it here manually if it's an expected margin of error.
+    if (h !== l) {
+      if (low === 9) {
+        l = 1;
+      } else if (high === 9 && low === 10) {
+        h = 1;
+      }
+    }
 
     if (h !== l) {
-      console.error('😟 bad pair', high, low);
+      this.handlers.error(
+        'bad pair',
+        high,
+        low,
+        `${h} != ${l}`,
+        `byte @ ${this.bytePtr}`
+      );
       bitPair.shift();
       return;
     }

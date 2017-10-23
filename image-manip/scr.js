@@ -102,7 +102,7 @@ async function sleep(ms) {
 
 async function put(ctx, imageData, x, y) {
   ctx.putImageData(imageData, x, y);
-  await sleep(1);
+  await sleep(0);
 }
 
 async function draw(ctx, third, data) {
@@ -203,7 +203,7 @@ async function colour(ctx, buffer) {
       });
     }
 
-    put(ctx, pixel, x * 8, y * 8); // replace the whole shebang
+    await put(ctx, pixel, x * 8, y * 8); // replace the whole shebang
   }
 }
 
@@ -225,8 +225,8 @@ function doBlink(ctx, buffer) {
   });
 }
 
-export default async function main() {
-  const buffer = await load('./midnight.scr');
+export default async function main(url) {
+  const buffer = await load(url || './remy.scr');
 
   const canvas = document.createElement('canvas');
   const log = document.createElement('pre');
@@ -305,7 +305,7 @@ blink: ${blink}
   setInterval(() => doBlink(ctx, buffer), 333);
 }
 
-function readAttributes(byte) {
+export function readAttributes(byte) {
   const bright = !!(byte & 64);
   const source = bright ? brightColours : normalColours;
 
@@ -339,4 +339,42 @@ function readFromPoint({ x, y, scale = 1, attribs = [] }) {
     blink,
     bright,
   };
+}
+
+function getIndexForXY(width, x, y) {
+  return width * y + x;
+}
+
+/**
+ * Converts canvas image data to SCR binary format
+ * @param {Number} third 0-2: the thirds of the screen data
+ * @param {Uint8Array} arrayBuffer expected to be 3 * 2048 + 768 (empty)
+ * @param {Uint8ClampedArray} canvasImageData canvas pixel data (expects to be filled)
+ */
+export function pixelsToBytes(third, arrayBuffer, canvasImageData) {
+  const data = arrayBuffer.subarray(third * 2048, (third + 1) * 2048);
+  const pixels = canvasImageData.subarray(
+    third * (canvasImageData.length / 3),
+    (third + 1) * (canvasImageData.length / 3)
+  );
+
+  let ptr = 0;
+
+  for (let offset = 0; offset < 8; offset++) {
+    for (let y = 0; y < 8; y++) {
+      const row = y * 8 + offset;
+
+      for (let x = 0; x < 32; x++) {
+        let byte = 0;
+
+        for (let j = 0; j < 8; j++) {
+          const index = getIndexForXY(256, x * 8 + j, row) * 4;
+          byte += (pixels[index] === 0 ? 1 : 0) << (7 - j);
+        }
+
+        data[ptr] = byte;
+        ptr++;
+      }
+    }
+  }
 }

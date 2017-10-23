@@ -4,7 +4,7 @@ import canvas from './canvas.js';
 
 async function main() {
   const audio = (window.audio = new Audio());
-  await audio.loadFromURL('./image-manip/midnight.scr');
+  await audio.loadFromURL('./image-manip/me-int.scr');
   audio.volume = 100;
   canvas.connect(audio.node);
 
@@ -15,7 +15,16 @@ async function main() {
   };
   setTimeout(() => audio.start(), 0);
 
-  document.documentElement.ontouchstart = () => audio.stop();
+  let running = true;
+  document.documentElement.onclick = async () => {
+    if (running) {
+      audio.stop();
+      canvas.stop();
+      running = false;
+    } else {
+      window.location.reload();
+    }
+  };
 }
 
 main();

@@ -30,6 +30,7 @@ async function start() {
       },
     },
     stream => {
+      window.stream = stream;
       const audio = ctx.createMediaStreamSource(stream);
       audio.connect(ctx.destination);
       main(audio);
@@ -77,10 +78,6 @@ async function main(audio) {
       newBytes.forEach((byte, i) => stream(imgCtx, byte, prevLength + i));
 
       prevLength = bytes.length;
-
-      // const blob = new Blob([bytes], { type: 'application/octet-binary' }); // pass a useful mime type here
-      // const url = URL.createObjectURL(blob);
-      // img.src = url;
     }
   };
 
@@ -117,7 +114,8 @@ PILOT: ${rom.state.pilot}
 SYN_ON: ${rom.state.synOn}
 SYN_OFF: ${rom.state.synOff}
 FILE: ${rom.state.header ? rom.state.header.filename : '???'}
-BYTES: ${progress || '?'}/${length || '?'} / ${(progress / length * 100) | 0}%`;
+BYTES: ${progress || '?'}/${length || '?'} / ${(progress / length * 100) | 0}%
+ERROR: ${rom.state.error}`;
   };
 
   // setTimeout(() => audio.start(), 0);

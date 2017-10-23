@@ -9,11 +9,13 @@ async function main() {
   bars.pilot();
   const audio = (window.audio = new Audio());
   // await audio.load(document.querySelector('img'));
-  await audio.loadFromURL('./image-manip/midnight.scr');
+  await audio.loadFromURL('./ffconf.scr');
   audio.volume = 100;
   const rom = (window.rom = new ROMLoader());
   rom.connect(audio);
   canvas.connect(audio.node);
+
+  console.log(audio.src.buffer.length);
 
   document.documentElement.onkeydown = e => {
     if (e.which === 27) {

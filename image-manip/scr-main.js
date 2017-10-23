@@ -16,4 +16,4 @@ async function simple() {
   const pixels = pixelsForSCR(buffer, ctx);
 }
 
-main();
+main('../escape.scr');
