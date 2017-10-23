@@ -1,7 +1,7 @@
 import { stream } from './image-manip/scr.js';
 
 async function main() {
-  const res = await fetch('./image-manip/midnight.scr');
+  const res = await fetch('./escape.scr');
   const arrayBuffer = await res.arrayBuffer();
   const buffer = new Uint8Array(arrayBuffer);
 

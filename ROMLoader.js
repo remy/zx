@@ -143,6 +143,7 @@ export default class ROMLoader {
 
     let pulse = null;
     while ((pulse = this.readPulse())) {
+      this.checkFinished();
       this.readByte(pulse);
       this.readData();
       this.readHeader();
@@ -150,6 +151,14 @@ export default class ROMLoader {
       this.readPilot(pulse);
     }
     this.update();
+  }
+
+  checkFinished() {
+    if (this.bytesPtr === this.state.header.length - 1) {
+      this.state.complete = true;
+      this.stop();
+      this.queue.push({ type: 'end' });
+    }
   }
 
   readPulse() {
@@ -302,15 +311,7 @@ export default class ROMLoader {
 
   readData() {
     if (this.state.header && !this.state.complete) {
-      const fin = this.bytesPtr === this.state.header.length - 1;
-
       this.state.data = this.bytesBuffer.slice(0, this.bytesPtr);
-
-      if (fin) {
-        this.state.complete = true;
-        this.stop();
-        this.handlers.end();
-      }
     }
   }
 

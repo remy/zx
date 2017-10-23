@@ -157,12 +157,12 @@ function attributesForBlock(block, print = false) {
 
   let ink = null;
   let paper = null;
-  const paperThreshhold = 64 / 100 * 5; // %
+  const paperThreshold = 64 / 100 * 2; // %
   inks.forEach((count, i) => {
     if ((paper === null && count > 0) || (count < paper && count > 0)) {
-      if (count > paperThreshhold) {
-        paper = i;
-      }
+      // if (count > paperThreshold) {
+      paper = i;
+      // }
     }
     if (count > ink && count > 0) {
       ink = i;
@@ -250,7 +250,8 @@ async function main() {
     bufferCtx,
     dither,
     {
-      matrix: Dither.matrices.none,
+      matrix: Dither.matrices.atkinson,
+      diffusionFactor: 1,
       step: 1,
       findColor: Dither.defaultFindColor,
     }

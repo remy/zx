@@ -9,7 +9,7 @@ async function main() {
   bars.pilot();
   const audio = (window.audio = new Audio());
   // await audio.load(document.querySelector('img'));
-  await audio.loadFromURL('./ffconf.scr');
+  await audio.loadFromURL('./people.scr');
   audio.volume = 100;
   const rom = (window.rom = new ROMLoader());
   rom.connect(audio);
@@ -44,6 +44,7 @@ async function main() {
       newBytes = bytes.slice(prevLength);
       bars.draw(newBytes);
       newBytes.forEach((byte, i) => stream(imgCtx, byte, prevLength + i));
+      console.log(prevLength, bytes.length);
       prevLength = bytes.length;
     }
   };
