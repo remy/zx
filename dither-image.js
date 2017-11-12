@@ -12,13 +12,13 @@ const colorMap = [
   [0xff, 0xff, 0],
   [0xff, 0xff, 0xff],
   [0, 0, 0],
-  // [0, 0, 0xd7],
-  // [0xd7, 0, 0],
-  // [0xd7, 0, 0xd7],
-  // [0, 0xd7, 0],
-  // [0, 0xd7, 0xd7],
-  // [0xd7, 0xd7, 0],
-  // [0xd7, 0xd7, 0xd7],
+  [0, 0, 0xd7],
+  [0xd7, 0, 0],
+  [0xd7, 0, 0xd7],
+  [0, 0xd7, 0],
+  [0, 0xd7, 0xd7],
+  [0xd7, 0xd7, 0],
+  [0xd7, 0xd7, 0xd7],
 ];
 
 const brightColours = new Map();
@@ -137,6 +137,17 @@ function loadPixels(third, allPixels, allData) {
   }
 }
 
+function getInkFromPixel(rgb) {
+  rgb = rgb.toString();
+  let ink = brightColours.get(rgb);
+
+  if (!ink) {
+    ink = normalColours.get(rgb); // << 3;
+  }
+
+  return ink;
+}
+
 function attributesForBlock(block, print = false) {
   if (print) console.log(block);
   window.block = block;
@@ -145,14 +156,7 @@ function attributesForBlock(block, print = false) {
   const inks = new Uint8Array((0b111 << 3) + 1).fill(0); // container array
 
   for (let i = 0; i < block.length / 4; i++) {
-    let inkRGB = [...block.subarray(i * 4, i * 4 + 3)].toString();
-    let ink = brightColours.get(inkRGB);
-
-    if (!ink) {
-      ink = normalColours.get(inkRGB) << 3;
-    }
-
-    if (print) console.log(inkRGB, ink);
+    const ink = getInkFromPixel([...block.subarray(i * 4, i * 4 + 3)]);
     inks[ink]++;
   }
 
@@ -169,19 +173,27 @@ function attributesForBlock(block, print = false) {
   if (print) console.log('paper set on %s', paper);
   if (print) console.log('ink pre shift: ', ink);
 
-  if (ink >> 3 === 0) {
-    attribute += 64;
-  } else {
+  // this helps massage the colours into a better position
+  if (ink === 7 && paper !== 7) {
+    [ink, paper] = [paper, ink];
+  }
+
+  // work out based on majority ink, whether we need a bright block
+  if (ink >> 3 === 0 || paper >> 3 === 0) {
+    // we're dealing with bright
+    if (ink >> 3 === 0 && inks[ink] > inks[paper]) {
+      attribute += 64;
+    } else if (paper >> 3 === 0 && inks[paper] > inks[ink]) {
+      attribute += 64;
+    }
+  }
+
+  if (ink >> 3 !== 0) {
     ink = ink >> 3;
   }
 
   if (paper >> 3 !== 0) {
-    paper >>= 3;
-  }
-
-  // this helps massage the colours into a better position
-  if (ink === 7 && paper !== 7) {
-    [ink, paper] = [paper, ink];
+    paper = paper >> 3;
   }
 
   if (print) {
@@ -213,7 +225,7 @@ function loadAttributes(pixels, inkData) {
 }
 
 async function main() {
-  const img = document.querySelector('#rem');
+  const img = document.querySelector('#jake');
   // ctx = drawing context with our source image
   const ctx = imageToCanvas(img, { width: 256, height: 192 });
 
@@ -242,15 +254,6 @@ async function main() {
   img2.src = URL.createObjectURL(blob, { 'content-type': 'image/png' });
   document.body.appendChild(img2);
 
-  // pixelData is black and white pixels (the binary SCR image)
-  const { imageData: pixelData, img: pixelImg } = await render(
-    ctx,
-    bufferCtx,
-    { dither: threshold },
-    // 138
-    128
-  );
-
   // inkData is the 8x8 coloured attribute reference
   const { imageData: inkData, img: inkImg } = await render(
     ctx,
@@ -263,6 +266,22 @@ async function main() {
       add: true,
     }
   );
+
+  const { imageData: pixelData, img: pixelImg } = await renderFromInk(
+    bufferCtx,
+    bufferCtx,
+    threshold,
+    { value: 138 }
+  );
+
+  // // pixelData is black and white pixels (the binary SCR image)
+  // const { imageData: pixelData, img: pixelImg } = await render(
+  //   ctx, // threshold off the ink'ed canvas rather than the original
+  //   bufferCtx,
+  //   { dither: threshold },
+  //   138
+  //   // 46
+  // );
 
   // load all the final output into SCR format - starting with binary for pixels
   const pixels = new Uint8Array(256 * 192 / 8 + 768);
@@ -302,12 +321,20 @@ async function main() {
 
   const rootCanvas = document.querySelector('canvas');
   rootCanvas.classList.add('crosshair');
+
+  let hover = true;
+
+  rootCanvas.onclick = () => {
+    hover = !hover;
+  };
+
   rootCanvas.onmousemove = e => {
+    if (!hover) return;
     const x = (e.pageX / 8) | 0;
     const y = (e.pageY / 8) | 0;
     zoomOriginal.seeXY(x, y);
-    zoomPixel.seeXY(x, y);
     zoomInk.seeXY(x, y);
+    zoomPixel.seeXY(x, y);
     zoomResult.seeXY(x, y);
     li.innerHTML = `{ x: ${x}, y: ${y} }`;
     const block = zoomInk.pixel(x, y);
@@ -331,6 +358,96 @@ async function render(ctx, bufferCtx, dither, options = {}) {
   const res = dither.dither(buffer.data, w, options);
   const imageData = new ImageData(new Uint8ClampedArray(res), w, h);
   bufferCtx.putImageData(imageData, 0, 0);
+
+  const blob = await imageToBlob(null, bufferCtx);
+  const img2 = new Image();
+  img2.src = URL.createObjectURL(blob, { 'content-type': 'image/png' });
+
+  return new Promise(resolve => {
+    img2.onload = setTimeout(() => resolve({ imageData, img: img2 }), 10);
+    document.body.appendChild(img2);
+  });
+}
+
+function getInkForBlock(zoom, x, y) {
+  const block = zoom.pixel(x, y);
+  // 1: find how many colours we're dealing with (256 elements)
+  // 2: if 2 - switch them to majority paper (0b0) and least ink (0b1)
+  // 3: if more than two, order then select
+  const byte = attributesForBlock(block);
+  const attributes = readAttributes(byte);
+  const newBlock = new Uint8ClampedArray(8 * 8 * 4);
+
+  const inks = new Uint8Array((0b111 << 3) + 1).fill(0); // container array
+
+  for (let i = 0; i < block.length / 4; i++) {
+    const ink = getInkFromPixel([...block.subarray(i * 4, i * 4 + 3)]);
+    inks[ink]++;
+  }
+
+  // 22, 17
+  const print = x === 22 && y === 17;
+
+  const usedInks = inks.filter((count, ink) => {
+    // count && console.log('ink %s (count: %s)', ink, count);
+    return count > 0;
+  }).length;
+
+  if (print) console.log('inks used: %s', usedInks);
+
+  for (let i = 0; i < 64; i++) {
+    const ink = getInkFromPixel([...block.subarray(i * 4, i * 4 + 3)]);
+
+    if (print)
+      console.log(
+        'ink found: %s, ink: %s, paper: %s',
+        ink,
+        attributes.values.ink,
+        attributes.values.paper
+      );
+
+    if (usedInks === 1) {
+      newBlock.set([255, 255, 255, 255], i * 4);
+    } else if (ink === attributes.values.ink) {
+      newBlock.set([0, 0, 0, 255], i * 4);
+    } else if (ink === attributes.values.paper) {
+      newBlock.set([255, 255, 255, 255], i * 4);
+    } else {
+      newBlock.set([0, 0, 0, 255], i * 4);
+    }
+  }
+
+  if (print) console.log(newBlock);
+
+  return newBlock;
+}
+
+window.getInkForBlock = getInkForBlock;
+
+async function renderFromInk(ctx, bufferCtx, dither, options = {}) {
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  const buffer = ctx.getImageData(0, 0, w, h);
+
+  const res = new Uint8ClampedArray(h * w * 4);
+  const zoom = new Zoom(buffer.data);
+  window.inkZoom = zoom;
+  let ptr = 0;
+
+  for (let y = 0; y < 192 / 8; y++) {
+    for (let x = 0; x < 256 / 8; x++) {
+      const newBlock = getInkForBlock(zoom, x, y);
+
+      bufferCtx.putImageData(new ImageData(newBlock, 8, 8), x * 8, y * 8);
+      // if (x === 0) console.log(block);
+      //  = attributesForBlock(block, print);
+
+      ptr++;
+    }
+  }
+
+  const imageData = bufferCtx.getImageData(0, 0, w, h);
+  // bufferCtx.putImageData(imageData, 0, 0);
 
   const blob = await imageToBlob(null, bufferCtx);
   const img2 = new Image();
