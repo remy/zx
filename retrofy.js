@@ -213,4 +213,4 @@ async function renderFromInk(ctx, bufferCtx) {
   return { imageData };
 }
 
-main();
+// main();

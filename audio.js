@@ -245,6 +245,11 @@ export default class Audio {
     this.src.buffer = buffer;
   }
 
+  async loadFromData(data, filename = 'image.scr') {
+    const buffer = generateHeader(ctx, filename, new Uint8Array(data));
+    this.src.buffer = buffer;
+  }
+
   async loadFromURL(url) {
     const res = await fetch(url);
     const binary = await res.arrayBuffer();
