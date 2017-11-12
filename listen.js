@@ -40,7 +40,11 @@ async function start() {
 }
 
 async function main(audio) {
+  const container = document.createElement('div');
+  container.style.display = 'inline-block';
+  document.body.appendChild(container);
   const bars = new Bars();
+  container.appendChild(bars.canvas);
   const rom = (window.rom = new ROMLoader());
   const gain = ctx.createGain();
   gain.connect(ctx.destination);
@@ -65,8 +69,16 @@ async function main(audio) {
   img.width = 256;
   img.height = 192;
   img.className = 'styled';
-  document.body.appendChild(img);
+  img.style.zIndex = 10;
+  container.appendChild(img);
   const imgCtx = img.getContext('2d');
+
+  let full = false;
+  container.ondblclick = () => {
+    if (!full) {
+      container.requestFullscreen();
+    }
+  };
 
   let prevLength = 0;
   let newBytes = new Uint8Array(0); // updated as this type later
@@ -85,11 +97,11 @@ async function main(audio) {
     console.log('finished');
     canvas.stop();
     // audio.stop();
-    const blob = new Blob([rom.state.data], {
-      type: 'application/octet-binary',
-    });
-    const url = URL.createObjectURL(blob);
-    img.src = url;
+    // const blob = new Blob([rom.state.data], {
+    //   type: 'application/octet-binary',
+    // });
+    // const url = URL.createObjectURL(blob);
+    // img.src = url;
   };
 
   rom.handlers.update = () => {
@@ -102,12 +114,12 @@ edgeCounter: ${rom.edgeCounter}
 timing: ${rom.timing}
 last byte: ${rom.byteBuffer[0].toString(2).padStart(8, '0')}
 new bytes: ${Array.from(newBytes)
-    .map(_ =>
-      _.toString(16)
-        .toUpperCase()
-        .padStart(2, '0')
-    )
-    .join(' ')}
+      .map(_ =>
+        _.toString(16)
+          .toUpperCase()
+          .padStart(2, '0')
+      )
+      .join(' ')}
 
 SAMPLE_RATE: ${rom.SAMPLE_RATE}
 PILOT: ${rom.state.pilot}

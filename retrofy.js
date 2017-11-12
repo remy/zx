@@ -74,7 +74,7 @@ async function pixelsToImage(pixels) {
   return new Promise(resolve => (img.onload = () => resolve(img)));
 }
 
-async function main() {
+export default async function main() {
   const username = prompt('Give me a twitter handle:');
 
   // ctx = drawing context with our source image
@@ -213,4 +213,4 @@ async function renderFromInk(ctx, bufferCtx) {
   return { imageData };
 }
 
-// main();
+if (window.location.search.includes('retrofy')) main();

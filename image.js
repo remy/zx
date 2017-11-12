@@ -1,4 +1,4 @@
-import Zoom from './zoom.js';
+import Zoom from './Zoom.js';
 
 export default function main(image) {
   return imageToBlob(image).then(fileToBinary);
