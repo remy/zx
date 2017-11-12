@@ -1,3 +1,5 @@
+import Zoom from './zoom.js';
+
 export default function main(image) {
   return imageToBlob(image).then(fileToBinary);
 }
@@ -10,6 +12,49 @@ export function contrast(imageData, contrast = 50) {
     data[i] = data[i] * contrast + intercept;
     data[i + 1] = data[i + 1] * contrast + intercept;
     data[i + 2] = data[i + 2] * contrast + intercept;
+  }
+  return imageData;
+}
+
+export function threshold(data, _, threshold = _) {
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    const test = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+    const v = test >= threshold ? 255 : 0;
+    data[i] = data[i + 1] = data[i + 2] = v;
+  }
+
+  invertPotentialInk(data);
+
+  return data;
+}
+
+export function invertPotentialInk(imageData) {
+  const zoom = new Zoom(imageData);
+  for (let y = 0; y < 192 / 8; y++) {
+    for (let x = 0; x < 256 / 8; x++) {
+      const block = zoom.pixel(x, y);
+
+      let inkCount = 0;
+      for (let i = 0; i < 8 * 8 * 4; i += 4) {
+        if (block[i] === 0) {
+          // black = ink
+          inkCount = inkCount + 1;
+        }
+      }
+
+      if (inkCount < 32) {
+        // flip
+        for (let i = 0; i < 8 * 8 * 4; i += 4) {
+          const c = block[i] === 0 ? 255 : 0;
+          block[i] = block[i + 1] = block[i + 2] = c;
+        }
+      }
+    }
   }
   return imageData;
 }
@@ -73,36 +118,10 @@ export async function imageToBlob(img, ctx = imageToCanvas(img)) {
   });
 }
 
-export function chrToBinary(chr) {
-  return chr
-    .charCodeAt(0) // R = 82
-    .toString(2) // 82 = 1010010
-    .padStart(8, '0'); // 1010010 = 01010010
-}
-
 export function fileToBinary(file) {
   return new Promise(resolve => {
     const reader = new window.FileReader();
-
-    reader.onloadend = function() {
-      const result = reader.result;
-      // console.log('image.js: fileToBinary length: %s', result.length);
-      return resolve(new Uint8Array(result));
-
-      const binary = new Uint8Array(result.length);
-      for (let i = 0; i < result.length; i++) {
-        const chr = result[i];
-        chrToBinary(chr);
-        binary.push();
-      }
-
-      resolve(
-        binary.reduce((acc, byte) => {
-          return acc.concat(byte.split(''));
-        }, [])
-      );
-    };
-
+    reader.onloadend = () => resolve(new Uint8Array(reader.result));
     reader.readAsArrayBuffer(file);
   });
 }

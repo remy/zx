@@ -1,6 +1,6 @@
 import Dither from './Dither.js';
 import Zoom from './Zoom.js';
-import { imageToCanvas, imageToBlob, contrast } from './image.js';
+import { imageToCanvas, imageToBlob, contrast, threshold } from './image.js';
 import { readAttributes, pixelsForSCR } from './image-manip/scr.js';
 
 const colorMap = [
@@ -12,13 +12,13 @@ const colorMap = [
   [0xff, 0xff, 0],
   [0xff, 0xff, 0xff],
   [0, 0, 0],
-  [0, 0, 0xd7],
-  [0xd7, 0, 0],
-  [0xd7, 0, 0xd7],
-  [0, 0xd7, 0],
-  [0, 0xd7, 0xd7],
-  [0xd7, 0xd7, 0],
-  [0xd7, 0xd7, 0xd7],
+  // [0, 0, 0xd7],
+  // [0xd7, 0, 0],
+  // [0xd7, 0, 0xd7],
+  // [0, 0xd7, 0],
+  // [0, 0xd7, 0xd7],
+  // [0xd7, 0xd7, 0],
+  // [0xd7, 0xd7, 0xd7],
 ];
 
 const brightColours = new Map();
@@ -139,9 +139,10 @@ function loadPixels(third, allPixels, allData) {
 
 function attributesForBlock(block, print = false) {
   if (print) console.log(block);
+  window.block = block;
 
   let attribute = 0;
-  const inks = new Uint8Array((0b111 << 3) + 1).fill(0);
+  const inks = new Uint8Array((0b111 << 3) + 1).fill(0); // container array
 
   for (let i = 0; i < block.length / 4; i++) {
     let inkRGB = [...block.subarray(i * 4, i * 4 + 3)].toString();
@@ -155,19 +156,11 @@ function attributesForBlock(block, print = false) {
     inks[ink]++;
   }
 
-  let ink = null;
-  let paper = null;
-  const paperThreshold = 64 / 100 * 2; // %
-  inks.forEach((count, i) => {
-    if ((paper === null && count > 0) || (count < paper && count > 0)) {
-      // if (count > paperThreshold) {
-      paper = i;
-      // }
-    }
-    if (count > ink && count > 0) {
-      ink = i;
-    }
-  });
+  let [{ ink: paper }, { ink } = { ink: 0 }] = Array.from(inks)
+    .map((count, ink) => ({ ink, count }))
+    .filter(({ count }) => count)
+    .sort((a, b) => a.count - b.count)
+    .slice(-2);
 
   if (paper === null) {
     paper = ink;
@@ -186,6 +179,11 @@ function attributesForBlock(block, print = false) {
     paper >>= 3;
   }
 
+  // this helps massage the colours into a better position
+  if (ink === 7 && paper !== 7) {
+    [ink, paper] = [paper, ink];
+  }
+
   if (print) {
     console.log('ink: %s, paper: %s', ink, paper);
     inks.forEach(
@@ -193,8 +191,8 @@ function attributesForBlock(block, print = false) {
     );
   }
 
-  attribute += ink << 3;
-  attribute += paper;
+  attribute += paper << 3;
+  attribute += ink;
 
   return attribute;
 }
@@ -224,7 +222,7 @@ async function main() {
   const h = canvas.height;
 
   // adjust contrast
-  ctx.putImageData(contrast(ctx.getImageData(0, 0, w, h), 25), 0, 0);
+  // ctx.putImageData(contrast(ctx.getImageData(0, 0, w, h), 25), 0, 0);
 
   // buffer to draw into rather than making a new canvas each time
   const bufferCtx = document.createElement('canvas').getContext('2d');
@@ -248,19 +246,10 @@ async function main() {
   const { imageData: pixelData, img: pixelImg } = await render(
     ctx,
     bufferCtx,
-    dither,
-    {
-      matrix: Dither.matrices.atkinson,
-      diffusionFactor: 1,
-      step: 1,
-      findColor: Dither.defaultFindColor,
-    }
+    { dither: threshold },
+    // 138
+    128
   );
-  // const paperData = await render(bufferCtx, bufferCtx, dither, {
-  //   matrix: Dither.matrices.atkinson,
-  //   step: 8,
-  //   findColor: findColor,
-  // });
 
   // inkData is the 8x8 coloured attribute reference
   const { imageData: inkData, img: inkImg } = await render(
@@ -269,7 +258,8 @@ async function main() {
     dither,
     {
       step: 1,
-      matrix: Dither.matrices.atkinson,
+      diffusionFactor: 0.1,
+      matrix: Dither.matrices.none,
       add: true,
     }
   );
@@ -297,7 +287,7 @@ async function main() {
   // link.download = 'image.scr';
   // link.href = scrURL;
   // link.innerHTML = 'Download .SCR file';
-  ul.innerHTML = `<li><a href="${scrURL}" download="image.scr">Download .SCR file</a></li>`;
+  ul.innerHTML = `<li><a href="${scrURL}" download="image.scr">Download .SCR file</a> (<a href="${true}">img</a></li>`;
 
   const li = document.createElement('li');
   ul.appendChild(li);
@@ -305,22 +295,32 @@ async function main() {
   ul.appendChild(attribsLI);
   document.body.appendChild(ul);
 
-  const zoomInk = new Zoom(inkImg);
+  const zoomOriginal = new Zoom(img2);
   const zoomPixel = new Zoom(pixelImg);
+  const zoomInk = new Zoom(inkImg);
   const zoomResult = new Zoom(scrCtx);
 
-  img2.onmousemove = e => {
+  const rootCanvas = document.querySelector('canvas');
+  rootCanvas.classList.add('crosshair');
+  rootCanvas.onmousemove = e => {
     const x = (e.pageX / 8) | 0;
     const y = (e.pageY / 8) | 0;
+    zoomOriginal.seeXY(x, y);
+    zoomPixel.seeXY(x, y);
     zoomInk.seeXY(x, y);
     zoomResult.seeXY(x, y);
-    zoomPixel.seeXY(x, y);
     li.innerHTML = `{ x: ${x}, y: ${y} }`;
     const block = zoomInk.pixel(x, y);
     const byte = attributesForBlock(block);
     window.attributesForBlock = attributesForBlock.bind(null, block);
     const debug = y === 18 && x === 20;
-    attribsLI.innerHTML = JSON.stringify(readAttributes(byte, debug));
+    const attribs = readAttributes(byte, debug);
+    const ink = attribs.ink.join(',');
+    const paper = attribs.paper.join(',');
+    attribsLI.innerHTML = `ink: ${ink} (${attribs.values
+      .ink}) <span class="block" style="background: rgb(${ink})"></span>, paper: ${paper} (${attribs
+      .values
+      .paper}) <span class="block" style="background: rgb(${paper})"></span>`;
   };
 }
 

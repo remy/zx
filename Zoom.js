@@ -2,6 +2,8 @@ function getIndexForXY(width, x, y) {
   return width * y + x;
 }
 
+let order = 1;
+
 export default class Zoom {
   constructor(buffer) {
     if (buffer instanceof HTMLImageElement) {
@@ -13,6 +15,7 @@ export default class Zoom {
       const ctx = (buffer = canvas.getContext('2d'));
       ctx.drawImage(img, 0, 0);
       img.parentNode.replaceChild(canvas, img);
+      this.order = order++;
     }
 
     if (buffer instanceof CanvasRenderingContext2D) {
@@ -35,10 +38,10 @@ export default class Zoom {
     this._last = null;
   }
 
-  makeVisible() {
+  makeVisible(target = document.body) {
     const canvas = document.createElement('canvas');
     canvas.className = 'zoom';
-    document.body.appendChild(canvas);
+    target.appendChild(canvas);
     this.ctx = canvas.getContext('2d');
 
     const scale = 20;
@@ -47,7 +50,10 @@ export default class Zoom {
     canvas.style.imageRendering = 'pixelated';
     canvas.style.width = `${w * scale}px`;
     canvas.style.height = `${h * scale}px`;
+    canvas.style.setProperty('--order', this.order);
     this.isVisible = true;
+
+    return this;
   }
 
   put(imageData) {

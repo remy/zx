@@ -6,8 +6,17 @@
     margin: 0;
   }
 
+  .block {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    outline: 1px solid #efefef;
+  }
+
   .zoom {
-    padding: 10px;
+    padding: 2px;
+    border: 1px dashed #ccc;
+    margin: 2px;
   }
 
   canvas {
@@ -44,6 +53,10 @@
     font-size: 2rem;
   }
 
+  .dither-image ul {
+    font-size: 1rem;
+  }
+
   img[hidden] {
     display: none;
   }
@@ -64,6 +77,10 @@
     /* IE                            */
   }
 
+  .crosshair {
+    cursor: none;
+  }
+
   .styled {
     /* border: 50px solid white; */
     --scale: 1;
@@ -82,7 +99,7 @@
   }
 </style>
 <img src="me-int.gif" hidden>
-<img src="cfp-people-min.png" id="rem" hidden>
+<img src="rem.png" id="rem" hidden>
 <img id="heart" src="8x8-heart.png" hidden>
 <img src="cfp-people-min.png" hidden>
 <script type="text/html" id="index">
@@ -112,7 +129,9 @@
   if (window.location.search) {
     const script = document.createElement('script');
     script.type = 'module';
-    script.src = window.location.search.substr(1) + '.js';
+    const src = window.location.search.substr(1);
+    script.src = src + '.js';
+    document.documentElement.classList.add(src);
     document.documentElement.appendChild(script);
   } else {
     document.documentElement.innerHTML = document.querySelector('#index').innerHTML;

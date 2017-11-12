@@ -273,11 +273,11 @@ x: ${x} (${x / 8})
 y: ${y} (${y / 8})
 byte: ${byte}
 ink: <span style="color: white; text-shadow: 1px 1px 0 #000; background: rgb(${ink.join(
-    ','
-  )})">${(byte & 7).toString(2).padStart(3, '0')}</span>
+      ','
+    )})">${(byte & 7).toString(2).padStart(3, '0')}</span>
 paper: <span style="color: white; text-shadow: 1px 1px 0 #000; background: rgb(${paper.join(
-    ','
-  )})">${((byte & 56) >> 3).toString(2).padStart(3, '0')}</span>
+      ','
+    )})">${((byte & 56) >> 3).toString(2).padStart(3, '0')}</span>
 bright: ${bright}
 blink: ${blink}
 `;
@@ -309,11 +309,17 @@ export function readAttributes(byte) {
   const bright = !!(byte & 64);
   const source = bright ? brightColours : normalColours;
 
-  const ink = source[byte & 7]; // 0b00000111
-  const paper = source[(byte & 56) >> 3]; // 0b00111000
+  const values = {
+    ink: byte & 7,
+    paper: (byte & 56) >> 3,
+  };
+
+  const ink = source[values.ink]; // 0b00000111
+  const paper = source[values.paper]; // 0b00111000
   const blink = !!(byte & 128);
 
   return {
+    values,
     bright,
     ink,
     paper,

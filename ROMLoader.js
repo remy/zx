@@ -220,11 +220,6 @@ export default class ROMLoader {
         const parity = calculateXORChecksum(bytes.slice(0, -1));
 
         if (parity !== bytes[bytes.length - 1]) {
-          // console.error(
-          //   'R Tape Loading Error',
-          //   parity,
-          //   bytes[bytes.length - 1]
-          // );
           this.handlers.error(
             'R Tape Loading Error',
             parity,
