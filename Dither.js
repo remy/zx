@@ -1,12 +1,55 @@
 import matrices from './matrices.js';
 
-const defaultFindColor = rgb => {
-  if (rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11 < 127) {
-    return [0, 0, 0, 255];
-  } else {
-    return [255, 255, 255, 255];
+const colorMap = [
+  [0, 0, 0xff],
+  [0xff, 0, 0],
+  [0xff, 0, 0xff],
+  [0, 0xff, 0],
+  [0, 0xff, 0xff],
+  [0xff, 0xff, 0],
+  [0xff, 0xff, 0xff],
+  [0, 0, 0],
+  [0, 0, 0xd7],
+  [0xd7, 0, 0],
+  [0xd7, 0, 0xd7],
+  [0, 0xd7, 0],
+  [0, 0xd7, 0xd7],
+  [0xd7, 0xd7, 0],
+  [0xd7, 0xd7, 0xd7],
+];
+
+function getDistance(current, match) {
+  const redDifference = current[0] - match[0];
+  const greenDifference = current[1] - match[1];
+  const blueDifference = current[2] - match[2];
+
+  return (
+    redDifference * redDifference +
+    greenDifference * greenDifference +
+    blueDifference * blueDifference
+  );
+}
+
+// feels expensive, but https://www.cyotek.com/blog/finding-nearest-colors-using-euclidean-distance
+function defaultFindColor(rgb) {
+  let shortestDistance;
+  let index;
+
+  index = -1;
+  shortestDistance = Number.MAX_SAFE_INTEGER;
+
+  for (let i = 0; i < colorMap.length; i++) {
+    const match = colorMap[i];
+    const distance = getDistance(rgb, match);
+
+    if (distance < shortestDistance) {
+      index = i;
+      shortestDistance = distance;
+    }
   }
-};
+
+  return [...colorMap[index], 255];
+}
 
 const defaults = {
   step: 4,

@@ -105,7 +105,7 @@ export default class Zoom {
           source.subarray(index, end)
         );
       }
-      data.set(source.subarray(index, end), offset);
+      data.set(source.slice(index, end), offset);
     }
 
     return data;

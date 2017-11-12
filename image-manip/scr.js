@@ -1,24 +1,11 @@
-const brightColours = {
-  0b000: [0, 0, 0],
-  0b001: [0, 0, 0xff],
-  0b010: [0xff, 0, 0],
-  0b011: [0xff, 0, 0xff],
-  0b100: [0, 0xff, 0],
-  0b101: [0, 0xff, 0xff],
-  0b110: [0xff, 0xff, 0],
-  0b111: [0xff, 0xff, 0xff],
-};
+import {
+  brightColours,
+  normalColours,
+  normalColoursLookup,
+  brightColoursLookup,
+} from '../8bit-colour.js';
 
-const normalColours = {
-  0b000: [0, 0, 0],
-  0b001: [0, 0, 0xd7],
-  0b010: [0xd7, 0, 0],
-  0b011: [0xd7, 0, 0xd7],
-  0b100: [0, 0xd7, 0],
-  0b101: [0, 0xd7, 0xd7],
-  0b110: [0xd7, 0xd7, 0],
-  0b111: [0xd7, 0xd7, 0xd7],
-};
+import Zoom from '../Zoom.js';
 
 const toBlink = [];
 let blinkOn = false;
@@ -29,7 +16,6 @@ function block(
   buffer, // expected to be 6912 long (2048 * 3 + 768)
   attribute = buffer.subarray(2048 * 3)[y * 32 + x]
 ) {
-  // console.log(x, y);
   const start = ((y / 8) | 0) * 2048;
   const pixels = buffer.subarray(start, start + 2048);
 
@@ -56,38 +42,6 @@ function block(
   }
 
   return pixel;
-}
-
-class Zoom {
-  constructor(buffer) {
-    const canvas = document.createElement('canvas');
-    canvas.id = 'zoom';
-    document.body.appendChild(canvas);
-    this.ctx = canvas.getContext('2d');
-
-    this.buffer = buffer;
-
-    const scale = 20;
-    const w = (canvas.width = 8);
-    const h = (canvas.height = 8);
-    canvas.style.imageRendering = 'pixelated';
-    canvas.style.width = `${w * scale}px`;
-    canvas.style.height = `${h * scale}px`;
-  }
-
-  put(imageData) {
-    const ctx = this.ctx;
-    ctx.putImageData(imageData, 0, 0);
-  }
-
-  seeXY(x, y) {
-    const imageData = new ImageData(this.pixel(x, y), 8, 8);
-    this.ctx.putImageData(imageData, 0, 0);
-  }
-
-  pixel(x = 0, y = 0) {
-    return block(x, y, this.buffer);
-  }
 }
 
 export async function load(url) {
@@ -284,7 +238,7 @@ blink: ${blink}
   };
 
   canvas.onclick = e => {
-    const { x, y, byte, bright, blink, ink, paper } = readFromPoint({
+    const { x, y, ink, paper } = readFromPoint({
       attribs,
       scale,
       x: e.pageX,
@@ -299,9 +253,6 @@ blink: ${blink}
     });
   };
 
-  // console.log(buffer);
-  // console.log(toBlink);
-  // toBlink.splice(0);
   setInterval(() => doBlink(ctx, buffer), 333);
 }
 
@@ -381,6 +332,114 @@ export function pixelsToBytes(third, arrayBuffer, canvasImageData) {
         data[ptr] = byte;
         ptr++;
       }
+    }
+  }
+}
+
+/**
+ * Converts canvas image data to SCR binary format
+ * @param {Number} third 0-2: the thirds of the screen data
+ * @param {Uint8Array} allPixels expected to be 3 * 2048 + 768
+ * @param {Uint8ClampedArray} allData canvas pixel data
+ */
+export function putPixels(third, allPixels, allData) {
+  const pixels = allPixels.subarray(third * 2048, (third + 1) * 2048);
+  const data = allData.subarray(
+    third * (allData.length / 3),
+    (third + 1) * (allData.length / 3)
+  );
+
+  let ptr = 0;
+
+  for (let offset = 0; offset < 8; offset++) {
+    for (let y = 0; y < 8; y++) {
+      const row = y * 8 + offset;
+
+      for (let x = 0; x < 32; x++) {
+        let bit = 0;
+
+        for (let j = 0; j < 8; j++) {
+          const index = getIndexForXY(256, x * 8 + j, row) * 4;
+          bit += (data[index] === 0 ? 1 : 0) << (7 - j);
+        }
+
+        pixels[ptr] = bit;
+        ptr++;
+      }
+    }
+  }
+}
+
+export function getInkFromPixel(rgb) {
+  rgb = `${rgb[0]},${rgb[1]},${rgb[2]}`;
+  let ink = brightColoursLookup.get(rgb);
+
+  if (!ink) {
+    ink = normalColoursLookup.get(rgb);
+  }
+
+  return ink;
+}
+
+export function attributesForBlock(block) {
+  let attribute = 0;
+  const inks = new Uint8Array((0b111 << 3) + 1).fill(0); // container array
+
+  for (let i = 0; i < block.length / 4; i++) {
+    const ink = getInkFromPixel([...block.slice(i * 4, i * 4 + 3)]);
+    inks[ink]++;
+  }
+
+  let [{ ink: paper }, { ink } = { ink: 0 }] = Array.from(inks)
+    .map((count, ink) => ({ ink, count }))
+    .filter(({ count }) => count)
+    .sort((a, b) => a.count - b.count)
+    .slice(-2);
+
+  if (paper === null) {
+    paper = ink;
+  }
+
+  // this helps massage the colours into a better position
+  if (ink === 7 && paper !== 7) {
+    [ink, paper] = [paper, ink];
+  }
+
+  // work out based on majority ink, whether we need a bright block
+  if (ink >> 3 === 0 || paper >> 3 === 0) {
+    // we're dealing with bright
+    if (ink >> 3 === 0 && inks[ink] > inks[paper]) {
+      attribute += 64;
+    } else if (paper >> 3 === 0 && inks[paper] > inks[ink]) {
+      attribute += 64;
+    }
+  }
+
+  if (ink >> 3 !== 0) {
+    ink = ink >> 3;
+  }
+
+  if (paper >> 3 !== 0) {
+    paper = paper >> 3;
+  }
+
+  attribute += paper << 3;
+  attribute += ink;
+
+  return attribute;
+}
+
+export function putAttributes(pixels, inkData) {
+  let ptr = 0;
+  const zoom = new Zoom(inkData);
+  for (let y = 0; y < 192 / 8; y++) {
+    for (let x = 0; x < 256 / 8; x++) {
+      const block = zoom.pixel(x, y);
+      const print = y === 18 && x === 20;
+
+      pixels[2048 * 3 + ptr] = attributesForBlock(block, print);
+
+      ptr++;
     }
   }
 }
