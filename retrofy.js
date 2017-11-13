@@ -32,6 +32,7 @@ export async function dither(url, all = false) {
 
   const { imageData: inkData } = await render(ctx, bufferCtx, dither, {
     diffusionFactor: 0.1,
+    matrix: Dither.matrices.atkinson,
   });
 
   const { imageData: pixelData } = await renderFromInk(bufferCtx, bufferCtx);
