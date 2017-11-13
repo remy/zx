@@ -82,29 +82,38 @@ async function main(audio) {
 
   let prevLength = 0;
   let newBytes = new Uint8Array(0); // updated as this type later
+
   rom.handlers.bytes = bytes => {
     if (bytes.length !== prevLength) {
       newBytes = bytes.slice(prevLength);
       bars.draw(newBytes);
-
       newBytes.forEach((byte, i) => stream(imgCtx, byte, prevLength + i));
-
+      console.log(prevLength, bytes.length);
       prevLength = bytes.length;
     }
   };
 
-  rom.handlers.end = () => {
-    console.log('finished');
-    canvas.stop();
-    // audio.stop();
-    // const blob = new Blob([rom.state.data], {
-    //   type: 'application/octet-binary',
-    // });
-    // const url = URL.createObjectURL(blob);
-    // img.src = url;
+  rom.handlers.pilot = () => {
+    bars.pilotDone();
   };
 
+  rom.handlers.end = () => {
+    console.log('finished');
+    // canvas.stop();
+    audio.stop();
+    const blob = new Blob([rom.state.data], {
+      type: 'application/octet-binary',
+    });
+    const url = URL.createObjectURL(blob);
+    img.src = url;
+  };
+
+  let pilot = 170;
   rom.handlers.update = () => {
+    if (rom.state.pilot !== true && rom.state.pilot > 1500) {
+      pilot ^= 0xff;
+      bars.draw(new Uint8Array(Array.from({ length: 4 }, () => pilot)));
+    }
     const progress = rom.state.data ? rom.state.data.length : 0;
     const length = rom.state.header ? rom.state.header.length - 1 : 0;
     pre.innerHTML = `edgePtr: ${rom.edgePtr}
@@ -126,8 +135,7 @@ PILOT: ${rom.state.pilot}
 SYN_ON: ${rom.state.synOn}
 SYN_OFF: ${rom.state.synOff}
 FILE: ${rom.state.header ? rom.state.header.filename : '???'}
-BYTES: ${progress || '?'}/${length || '?'} / ${(progress / length * 100) | 0}%
-ERROR: ${rom.state.error}`;
+BYTES: ${progress || '?'}/${length || '?'} / ${(progress / length * 100) | 0}%`;
   };
 
   // setTimeout(() => audio.start(), 0);

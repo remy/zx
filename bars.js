@@ -1,6 +1,11 @@
 const ZERO = '#0000ff';
 const ONE = '#ffff00';
 
+export const PRE_PILOT = '#d7d7d7';
+
+const PILOT = '#00ffff';
+const PILOT_ALT = '#ff0000';
+
 export default class Bars {
   constructor({ height = 192, width = 256 } = {}) {
     const canvas = document.createElement('canvas');
@@ -12,8 +17,7 @@ export default class Bars {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
 
-    this.bg = '#00ffff'; // pilot cyan
-    this.fg = '#ff0000';
+    this.reset();
   }
 
   canvas() {
@@ -30,6 +34,12 @@ export default class Bars {
     this.width = canvas.height = window.innerHeight;
   }
 
+  reset() {
+    this.fg = this.bg = PRE_PILOT;
+    this.ctx.fillStyle = this.bg;
+    this.ctx.fillRect(0, 0, this.width, this.height);
+  }
+
   pilotDone() {
     this.fg = ZERO;
     this.bg = ONE;
@@ -37,7 +47,9 @@ export default class Bars {
 
   pilot() {
     const ctx = this.ctx;
-    ctx.fillStyle = '#00ffff';
+    this.fg = PILOT;
+    this.bg = PILOT_ALT;
+    ctx.fillStyle = PILOT;
     ctx.fillRect(0, 0, this.width, this.height);
     ctx.clearRect(
       this.padLeft,

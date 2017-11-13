@@ -370,24 +370,35 @@ export function putPixels(third, allPixels, allData) {
   }
 }
 
-export function getInkFromPixel(rgb) {
+export function getInkFromPixel(rgb, shiftBright = false) {
   rgb = `${rgb[0]},${rgb[1]},${rgb[2]}`;
   let ink = brightColoursLookup.get(rgb);
 
   if (!ink) {
     ink = normalColoursLookup.get(rgb);
+    if (shiftBright) ink <<= 3;
   }
 
   return ink;
 }
 
-export function attributesForBlock(block) {
+export function attributesForBlock(block, print) {
   let attribute = 0;
   const inks = new Uint8Array((0b111 << 3) + 1).fill(0); // container array
 
   for (let i = 0; i < block.length / 4; i++) {
-    const ink = getInkFromPixel([...block.slice(i * 4, i * 4 + 3)]);
+    const ink = getInkFromPixel([...block.slice(i * 4, i * 4 + 3)], true);
     inks[ink]++;
+  }
+
+  if (print) {
+  }
+
+  if (print) {
+    Object.keys(inks).forEach(
+      (ink, count) =>
+        inks[count] && console.log('ink %s (%s)', ink, inks[count])
+    );
   }
 
   let [{ ink: paper }, { ink } = { ink: 0 }] = Array.from(inks)
@@ -408,6 +419,7 @@ export function attributesForBlock(block) {
   // work out based on majority ink, whether we need a bright block
   if (ink >> 3 === 0 || paper >> 3 === 0) {
     // we're dealing with bright
+    if (print) console.log('dealing with bright');
     if (ink >> 3 === 0 && inks[ink] > inks[paper]) {
       attribute += 64;
     } else if (paper >> 3 === 0 && inks[paper] > inks[ink]) {

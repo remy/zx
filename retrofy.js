@@ -1,6 +1,6 @@
 import Dither from './Dither.js';
 import Zoom from './Zoom.js';
-import { imageToCanvas, imageToBlob } from './image.js';
+import { imageToCanvas, contrast } from './image.js';
 import {
   attributesForBlock,
   readAttributes,
@@ -14,7 +14,10 @@ export async function dither(url, all = false) {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.src = url;
-  await new Promise(resolve => (img.onload = resolve));
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
   const ctx = imageToCanvas(img, { width: 256, height: 192 });
   const canvas = ctx.canvas;
   const w = canvas.width;
@@ -156,7 +159,7 @@ export default async function main() {
 async function render(ctx, bufferCtx, dither, options = {}) {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
-  const buffer = ctx.getImageData(0, 0, w, h);
+  const buffer = contrast(ctx.getImageData(0, 0, w, h), 90);
   const res = dither.dither(buffer.data, w, options);
   const imageData = new ImageData(new Uint8ClampedArray(res), w, h);
   bufferCtx.putImageData(imageData, 0, 0);
@@ -174,8 +177,11 @@ function putInkForBlock(
   // 1: find how many colours we're dealing with (256 elements)
   // 2: if 2 - switch them to majority paper (0b0) and least ink (0b1)
   // 3: if more than two, order then select
-  const byte = attributesForBlock(block);
+  const print = x === 15 && y === 8;
+  const byte = attributesForBlock(block, print);
   const attributes = readAttributes(byte);
+
+  if (print) console.log(attributes);
 
   for (let i = 0; i < 64; i++) {
     const ink = getInkFromPixel([...block.slice(i * 4, i * 4 + 3)]);
