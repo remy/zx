@@ -1,8 +1,23 @@
 import { dither } from './retrofy.js';
+import BufferLoader from './BufferLoader.js';
+import audioContext from './ctx.js';
 import Audio from './audio.js';
 import ROMLoader from './ROMLoader.js';
 import Bars, { PRE_PILOT } from './bars.js';
 import { stream } from './image-manip/scr.js';
+
+var click = null;
+
+const bufferLoader = new BufferLoader(audioContext, ['chr.m4a'], bufferList => {
+  click = async () => {
+    const sound = audioContext.createBufferSource();
+    sound.buffer = bufferList[0];
+
+    sound.connect(audioContext.destination);
+    sound.start(0);
+  };
+});
+bufferLoader.load();
 
 function setupDOM() {
   const styles = document.createElement('link');
@@ -82,27 +97,26 @@ function handleKeys(ctx) {
       const command = commands.get(key);
 
       if (state.next === 'K' && command) {
+        click();
         state.commands.push(command);
         state.next = 'L';
       } else if (state.next === 'L') {
         if (e.key.length === 1) {
           state.commands.push(e.key);
+          click();
         } else if (e.key === 'Delete') {
+          click();
           state.commands.pop();
-
           if (state.commands.length === 0) {
             state.next = 'K';
           }
         } else if (e.key === 'Enter') {
+          click();
           ctx.fillStyle = PRE_PILOT;
           ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-          console.log(
-            'resolving with',
-            state.commands.join('').replace(/^LOAD "(.*?)"/, '$1')
-          );
           stop();
-          resolve(state.commands.join('').replace(/^LOAD "(.*?)"/, '$1'));
+          resolve(state.commands.join('').replace(/^LOAD ['"](.*?)['"]/, '$1'));
         }
       }
       // }
