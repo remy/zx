@@ -116,6 +116,7 @@ function handleKeys(ctx) {
           ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
           stop();
+          document.documentElement.onkeydown = () => {};
           resolve(state.commands.join('').replace(/^LOAD ['"](.*?)['"]/, '$1'));
         }
       }

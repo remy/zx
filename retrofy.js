@@ -64,7 +64,6 @@ export async function dither(url, all = false) {
 }
 
 async function pixelsToImage(pixels) {
-  console.log('pixelToImage');
   const ctx = document.createElement('canvas').getContext('2d');
   const canvas = ctx.canvas;
   canvas.width = 256;
@@ -159,7 +158,7 @@ export default async function main() {
 async function render(ctx, bufferCtx, dither, options = {}) {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
-  const buffer = contrast(ctx.getImageData(0, 0, w, h), 90);
+  const buffer = contrast(ctx.getImageData(0, 0, w, h), 10);
   const res = dither.dither(buffer.data, w, options);
   const imageData = new ImageData(new Uint8ClampedArray(res), w, h);
   bufferCtx.putImageData(imageData, 0, 0);
