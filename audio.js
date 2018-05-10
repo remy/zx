@@ -22,6 +22,7 @@ const LOW = -0.15;
 // pulse lengths defined by ZX ROM documentation
 export const PILOT = 2168;
 export const PILOT_COUNT = 8063;
+export const PILOT_DATA_COUNT = 3222; // 3223
 export const ZERO = 855;
 export const ONE = 2 * ZERO;
 export const SYN_ON = 667;
@@ -172,6 +173,7 @@ export function generateHeader(ctx, filename = 'ZX Loader', data = [0]) {
   }
 
   let header = new Uint8Array([
+    0x00, // leader
     0xbf, // 0=program
     ...name, // Name (filename)
     length >> 8,
@@ -180,7 +182,7 @@ export function generateHeader(ctx, filename = 'ZX Loader', data = [0]) {
     0x00, // ""
     0x45, // param 2
     0x00, // ""
-    0x00, // this will be changed
+    0x00, // parity: this will be changed
   ]);
 
   // 19 header bytes (which are 8 bits)
