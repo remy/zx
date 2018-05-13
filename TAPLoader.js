@@ -175,10 +175,6 @@ export default class TAPLoader {
       this.readByte(pulse);
       this.readData();
 
-      if (this.bytesPtr === 1) {
-        // console.log(this.byteBuffer);
-      }
-
       this.readHeader();
       this.readSyn(pulse);
       this.readPilot(pulse);
@@ -194,11 +190,11 @@ export default class TAPLoader {
   }
 
   checkFinished() {
-    if (this.bytesPtr === this.state.header.length - 1) {
-      this.state.complete = true;
-      this.stop();
-      this.queue.push({ type: 'end' });
-    }
+    // if (this.bytesPtr === this.state.header.length - 1) {
+    //   this.state.complete = true;
+    //   this.stop();
+    //   this.queue.push({ type: 'end' });
+    // }
   }
 
   readPulse() {
@@ -223,6 +219,10 @@ export default class TAPLoader {
     for (; this.edgePtr < length; this.edgePtr++) {
       let point = buffer[this.edgePtr];
 
+      if (point > -0.001 && point < 0.001) {
+        // continue; // skip this point
+      }
+
       // search for when the buffer point crosses the zero threshold
       if (last !== null) {
         if (point === 0) {
@@ -230,9 +230,9 @@ export default class TAPLoader {
           continue;
         }
 
-        // this is bad sound data
+        // this ignores small noise from a mic input
         if (point > limit * -1 && point < limit) {
-          // continue;
+          continue;
         }
 
         // an edge is where the audio crosses the zero line in a wave
@@ -281,17 +281,13 @@ export default class TAPLoader {
       return ZERO;
     }
 
-    if (pulse === 9) {
-      return SYN_OFF;
-    }
-
     if (pulse === 8) {
-      return SYN_ON;
+      return this.state.synOn === false ? SYN_ON : ZERO;
     }
 
-    // const length = round(1 / SAMPLE_RATE * pulse, 10);
-
-    // const res = PULSE_LENGTH.get(length);
+    if (pulse === 9) {
+      return this.state.synOff === false ? SYN_OFF : ZERO;
+    }
 
     if (this.pulseType === SILENCE && pulse > 100) {
       // probably a PILOT
@@ -303,27 +299,28 @@ export default class TAPLoader {
       // somehow ONEs sometimes get missed
       // this.bitPair = [];
       // this.bitPair.push(pulse / 2);
+
       return __HACK_BIT;
     }
 
-    console.log(
-      `unknown pulse length: %s`,
-      pulse,
-      window.PULSE_TYPES.get(this.pulseType)
-    );
+    // console.log(
+    //   `unknown pulse length: %s`,
+    //   pulse,
+    //   window.PULSE_TYPES.get(this.pulseType)
+    // );
     return null;
     // return res;
   }
 
   readHeader() {
     const state = this.state;
-    if (
-      (state.synOff === true && state.header === false) ||
-      (state.synOff && state.type === null)
-    ) {
+    if (state.synOff === true && this.state.blockType === null) {
       // ref https://faqwiki.zxnet.co.uk/wiki/TAP_format#Format_Description
-      if (this.bytesPtr === 19) {
-        const bytes = this.bytesBuffer.slice(0, 19);
+      if (this.bytesPtr === 21) {
+        console.log(this.bytesBuffer.slice(0, 21));
+        const bytes = this.bytesBuffer.slice(2, 2 + 19);
+
+        this.stop();
 
         const get = n => {
           const res = bytes.slice(get.ptr, get.ptr + n);
@@ -339,7 +336,7 @@ export default class TAPLoader {
           // there's actually one more byte required…
         }
 
-        if (this.blockType === 'HEADER') {
+        if (this.blockType === 'HEADER' && (fileType === 0 || fileType === 3)) {
           const parity = calculateXORChecksum(bytes.slice(0, -1));
 
           if (parity !== bytes[bytes.length - 1]) {
@@ -385,7 +382,7 @@ export default class TAPLoader {
           // }
           console.log('%s: %s bytes', filename, length);
         } else {
-          console.log('GOT DATA', bytes);
+          // console.log('GOT DATA', bytes);
         }
 
         // reset the position of the byteBuffer
@@ -430,6 +427,10 @@ export default class TAPLoader {
       } else if (high === 9 && low === 11) {
         h = 1;
       }
+    }
+
+    if (this.blockType === null) {
+      return;
     }
 
     if (h !== l) {
@@ -497,7 +498,9 @@ export default class TAPLoader {
   }
 
   readSyn(pulse) {
-    const state = this.state;
+    if (!this.state.pilot) {
+      return; // waiting for pilot
+    }
 
     if (this.pulseType === SYN_ON) {
       console.log('SYN_ON: OK (pilot length: %s)', this.state.pilot);

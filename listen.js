@@ -1,6 +1,6 @@
 import ctx from './ctx.js';
 import { stream } from './image-manip/scr.js';
-import ROMLoader from './ROMLoader.js';
+import ROMLoader from './TAPLoader.js';
 import canvas from './canvas.js';
 import Bars from './bars.js';
 

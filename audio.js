@@ -173,8 +173,8 @@ export function generateHeader(ctx, filename = 'ZX Loader', data = [0]) {
   }
 
   let header = new Uint8Array([
-    0x00, // leader
-    0xbf, // 0=program
+    0x00, // 0=program
+    0x00, // 0=header
     ...name, // Name (filename)
     length >> 8,
     length & 0x00ff,
@@ -244,12 +244,26 @@ export default class Audio {
     const filename = element.src.split('/').pop();
     const binary = await image(element);
     const buffer = generateHeader(ctx, filename, binary);
-    this.src.buffer = buffer;
+    this.loadFromBuffer(buffer);
   }
 
   async loadFromData(data, filename = 'image.scr') {
-    const buffer = generateHeader(ctx, filename, new Uint8Array(data));
-    this.src.buffer = buffer;
+    this.loadFromBuffer(generateHeader(ctx, filename, new Uint8Array(data)));
+  }
+
+  async loadFromAudioURL(url) {
+    const res = await fetch(url);
+    const arrayBuffer = await res.arrayBuffer();
+    ctx.decodeAudioData(
+      arrayBuffer,
+      buffer => {
+        this.loadFromBuffer(buffer);
+      },
+      err => {
+        console.error(err);
+        throw err;
+      }
+    );
   }
 
   async loadFromURL(url) {
@@ -260,6 +274,10 @@ export default class Audio {
       url.split('/').pop(),
       new Uint8Array(binary)
     );
+    this.loadFromBuffer(buffer);
+  }
+
+  loadFromBuffer(buffer) {
     this.src.buffer = buffer;
   }
 

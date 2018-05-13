@@ -3,7 +3,7 @@ const analyser = (window.analyser = new Analyser());
 
 export default {
   connect: node => {
-    analyser.connect({ node });
+    analyser.connect(node);
     analyser.start(draw);
   },
   stop: () => {
@@ -14,7 +14,8 @@ export default {
 const canvas = document.createElement('canvas');
 document.body.appendChild(canvas);
 canvas.style.position = 'absolute';
-canvas.style.top = window.innerHeight * 0.1;
+// canvas.style.top = window.innerHeight * 0.1;
+canvas.style.bottom = 0;
 canvas.style.left = 0;
 const ctx = canvas.getContext('2d');
 const w = (canvas.width = window.innerWidth);
