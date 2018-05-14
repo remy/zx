@@ -1,16 +1,46 @@
 import { dither } from './retrofy.js';
 import Audio from './audio.js';
-import canvas from './canvas.js';
+// import canvas from './canvas.js';
+import { pixelsForSCR } from './image-manip/scr.js';
 
-async function main(url) {
+let running = false;
+let url = null;
+let audio;
+
+document.documentElement.onclick = async () => {
+  if (running) {
+    audio.stop();
+    // canvas.stop();
+    running = false;
+  } else if (url) {
+    main(url);
+  } else {
+    console.log('no url');
+  }
+};
+
+async function main(_url) {
+  url = _url;
+
+  console.log(url);
   // 1. capture image
   const pixels = await dither(url); //`https://twivatar.glitch.me/${username}`);
   console.log(pixels.length);
 
-  const audio = (window.audio = new Audio());
+  if (!audio) {
+    // first run, so render
+    const scrCtx = document.createElement('canvas').getContext('2d');
+    scrCtx.canvas.width = 256;
+    scrCtx.canvas.height = 192;
+    document.body.appendChild(scrCtx.canvas);
+    // validate our pixels by translating the SCR binary back into a canvas
+    pixelsForSCR(pixels, scrCtx);
+  }
+
+  audio = window.audio = new Audio();
   await audio.loadFromData(pixels);
   audio.volume = 100;
-  canvas.connect(audio);
+  // canvas.connect(audio);
 
   document.documentElement.onkeydown = e => {
     if (e.which === 27) {
@@ -19,16 +49,7 @@ async function main(url) {
   };
   setTimeout(() => audio.start(), 0);
 
-  let running = true;
-  document.documentElement.onclick = async () => {
-    if (running) {
-      audio.stop();
-      canvas.stop();
-      running = false;
-    } else {
-      window.location.reload();
-    }
-  };
+  running = true;
 }
 
 const input = document.createElement('input');

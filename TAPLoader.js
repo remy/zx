@@ -184,7 +184,7 @@ export default class TAPLoader {
     }
 
     if (this.pulseType === SILENCE) {
-      if (this.state.pilot) {
+      if (false && this.state.pilot) {
         console.log(
           'reset',
           this.blockType === 0 ? 'header' : 'data',
@@ -228,8 +228,8 @@ export default class TAPLoader {
     for (; this.edgePtr < length; this.edgePtr++) {
       let point = buffer[this.edgePtr];
 
-      if (point > -0.001 && point < 0.001) {
-        // continue; // skip this point
+      if (point > -0.01 && point < 0.01) {
+        continue; // skip this point
       }
 
       // search for when the buffer point crosses the zero threshold
@@ -246,6 +246,7 @@ export default class TAPLoader {
 
         // an edge is where the audio crosses the zero line in a wave
         if (isEdge(point, last)) {
+          // console.log(point);
           // pulse is the length of the half pulse wave
           const pulse = this.pulseBufferPtr;
 

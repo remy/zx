@@ -15,11 +15,15 @@ export default class Analyser {
 
   connect(target) {
     target.node.connect(this.analyser);
+    this.disconnect = () => {
+      target.node.disconnect();
+    };
   }
 
   stop() {
     cancelAnimationFrame(this[_rafTimer]);
     this[_rafTimer] = null;
+    this.disconnect();
   }
 
   start(callback = this.callback) {
