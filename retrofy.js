@@ -77,13 +77,16 @@ async function pixelsToImage(pixels) {
   return new Promise(resolve => (img.onload = () => resolve(img)));
 }
 
-export default async function main() {
+export default async function main(
+  url = `https://twivatar.glitch.me/${prompt('Give me a twitter handle:')}`
+) {
+  // export default async function main(url = './image-manip/tap-js.png') {
   // const username = prompt('Give me a twitter handle:');
 
   // ctx = drawing context with our source image
   const { pixels, inkData, pixelData, originalData } = await dither(
     // `https://twivatar.glitch.me/${username}`,
-    './image-manip/tap-js.png',
+    url,
     true
   );
 

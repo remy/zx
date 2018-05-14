@@ -10,7 +10,7 @@ async function main(url) {
   const audio = (window.audio = new Audio());
   await audio.loadFromData(pixels);
   audio.volume = 100;
-  canvas.connect(audio.node);
+  canvas.connect(audio);
 
   document.documentElement.onkeydown = e => {
     if (e.which === 27) {
