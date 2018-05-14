@@ -1,7 +1,7 @@
 import { stream } from './image-manip/scr.js';
 
 async function main() {
-  const res = await fetch('./escape.scr');
+  const res = await fetch('./screens/tap-js.scr');
   const arrayBuffer = await res.arrayBuffer();
   const buffer = new Uint8Array(arrayBuffer);
 

@@ -1,6 +1,6 @@
 <head>
   <meta name="viewport" content="width=device-width">
-  <link rel="preload" as="style" href="styles.css">
+  <link as="style" href="styles.css">
 </head>
 <style>
   body {
@@ -82,6 +82,11 @@
     cursor: none;
   }
 
+  #root {
+    display: flex;
+    position: relative;
+  }
+
   .styled {
     /* border: 50px solid white; */
     --scale: 1;
@@ -90,7 +95,7 @@
     /* width: calc(256px * 1); */
     width: calc(256px * var(--scale));
     position: absolute;
-    top: 43px;
+    top: 23px;
     left: 32px;
     /* display: flex; */
     align-items: center;

@@ -37,6 +37,7 @@ export const isEdge = (a, b) => !((a >= 0) ^ (b < 0));
 
 export default class TAPLoader {
   constructor() {
+    this.strict = true;
     this.pulseBuffer = new Float32Array(bufferSize * 2);
     this.edgePtr = 0;
     this.pulseBufferPtr = 0;
@@ -179,12 +180,20 @@ export default class TAPLoader {
       this.readSyn(pulse);
       this.readPilot(pulse);
       this.state.silent = 0;
+      // console.log(window.PULSE_TYPES.get(tap.pulseType));
     }
 
     if (this.pulseType === SILENCE) {
+      if (this.state.pilot) {
+        console.log(
+          'reset',
+          this.blockType === 0 ? 'header' : 'data',
+          this.bytesBuffer.slice(0, this.bytesPtr)
+        );
+      }
       this.state.pilot = 0;
       this.bytesPtr = 0;
-      this.state.blockType = null;
+      this.blockType = null;
     }
     this.update();
   }
@@ -274,19 +283,37 @@ export default class TAPLoader {
     }
 
     if (pulse === 22 || pulse === 21) {
+      // console.log('ONE');
       return ONE;
     }
 
     if (pulse === 11 || pulse === 10) {
+      // console.log('ZERO');
       return ZERO;
     }
 
-    if (pulse === 8) {
-      return this.state.synOn === false ? SYN_ON : ZERO;
-    }
+    // this is poor error handling due to questionable audio quality over the mic
+    if (this.state.pilot > 1000) {
+      if (!this.state.synOff) {
+        // !this.state.synOn ||
+        if (pulse === 8) {
+          // console.log('SYN_ON');
+          return SYN_ON;
+        }
 
-    if (pulse === 9) {
-      return this.state.synOff === false ? SYN_OFF : ZERO;
+        if (pulse >= 9 || pulse <= 12) {
+          // console.log('SYN_OFF');
+          return SYN_OFF;
+        }
+      } else {
+        if (pulse < 15) {
+          return ZERO;
+        }
+
+        if (pulse > 15 && pulse < 30) {
+          return ONE;
+        }
+      }
     }
 
     if (this.pulseType === SILENCE && pulse > 100) {
@@ -303,91 +330,75 @@ export default class TAPLoader {
       return __HACK_BIT;
     }
 
-    // console.log(
-    //   `unknown pulse length: %s`,
-    //   pulse,
-    //   window.PULSE_TYPES.get(this.pulseType)
-    // );
+    // console.log(`unknown pulse length: %s`, pulse);
     return null;
     // return res;
   }
 
   readHeader() {
     const state = this.state;
-    if (state.synOff === true && this.state.blockType === null) {
-      // ref https://faqwiki.zxnet.co.uk/wiki/TAP_format#Format_Description
-      if (this.bytesPtr === 21) {
-        console.log(this.bytesBuffer.slice(0, 21));
-        const bytes = this.bytesBuffer.slice(2, 2 + 19);
 
-        this.stop();
+    if ((state.synOn === true || state.synOff) && this.blockType === null) {
+      // then we're ready for the header
 
-        const get = n => {
-          const res = bytes.slice(get.ptr, get.ptr + n);
-          get.ptr += n;
-          return res;
-        };
-        get.ptr = 0;
+      const headerLength = 19; // aka 0x13 0x00 LSb Msb… => 0x0013
 
-        this.blockType = BLOCK_TYPE.get(get(1)[0]);
-        const fileType = get(1)[0];
-
-        if (fileType === 3) {
-          // there's actually one more byte required…
-        }
-
-        if (this.blockType === 'HEADER' && (fileType === 0 || fileType === 3)) {
-          const parity = calculateXORChecksum(bytes.slice(0, -1));
-
-          if (parity !== bytes[bytes.length - 1]) {
-            this.handlers.error(
-              'R Tape Loading Error',
-              'parity: ' + parity,
-              'checksum: ' + bytes[bytes.length - 1],
-              bytes.length,
-              bytes
-            );
-            this.bytesPtr = 0;
-            return null;
-          }
-
-          console.log('HEADER: OK', bytes);
-          // this.state.type = bytes[1];
-
-          const filename = decode(get(10));
-          if (fileType === 3) {
-            get(1);
-          }
-          const [MSb, LSb] = get(2);
-          const length = (MSb << 8) + LSb; // length is held in 2 bytes
-
-          if (fileType === 3) {
-            // then read the address from param1
-            const mem = get(2);
-
-            console.log(
-              'memory of data',
-              ((mem[0] << 8) + mem[1]).toString(16)
-            );
-
-            if (((mem[0] << 8) + mem[1]).toString(16) === '4000') {
-              this.state.type = 3;
-            }
-          }
-
-          // if (bytes[1] !== 3) {
-          this.state.header = { filename, length };
-          // } else {
-          // this.state.header.length = 6912;
-          // }
-          console.log('%s: %s bytes', filename, length);
-        } else {
-          // console.log('GOT DATA', bytes);
-        }
-
-        // reset the position of the byteBuffer
-        this.bytesPtr = 0;
+      // zero index, length = 19
+      if (this.bytesPtr < headerLength) {
+        return;
       }
+
+      const bytes = this.bytesBuffer.slice(0, headerLength);
+
+      function get(bytes, n) {
+        const res = bytes.slice(get.ptr, get.ptr + n);
+        get.ptr += n;
+        return res;
+      }
+
+      get.ptr = 0;
+
+      const header = {};
+
+      header.blockType = this.blockType = get(bytes, 1)[0]; // 1
+
+      // this is a data block type - exit and let the read bytes do it's work
+      if (header.blockType === 0xff) {
+        return;
+      }
+
+      header.fileType = get(bytes, 1)[0]; // 2
+      header.filename = decode(get(bytes, 10)); // 12
+      // get(bytes, 1);
+      header.length = get(bytes, 2); // 14
+      header.param1 = get(bytes, 2); // 16
+      header.param2 = get(bytes, 2); // 17
+      const parityCheck = get(bytes, 1)[0]; // n:18 = flag
+
+      const parity = calculateXORChecksum(bytes.slice(0, -1));
+
+      if (parity !== bytes[bytes.length - 1]) {
+        this.handlers.error(
+          'R Tape Loading Error',
+          'parity: ' + parity,
+          'checksum: ' + bytes[bytes.length - 1],
+          bytes.length,
+          bytes
+        );
+        this.bytesPtr = 0;
+        return null;
+      }
+
+      header.parity = true;
+
+      // convert these `word` values to INT from LSb, i.e. 0x001b = 6912 (length of screen)
+      ['length', 'param1', 'param2'].forEach(key => {
+        header[key] = (header[key][1] << 8) + header[key][0];
+      });
+
+      state.header = header;
+
+      console.log('HEADER: OK', this.state.header, bytes);
     }
   }
 
@@ -397,52 +408,51 @@ export default class TAPLoader {
     }
 
     const bitPair = this.bitPair;
-    bitPair.push(pulse);
+    // bitPair.push(pulse);
+    bitPair.push(this.pulseType);
 
     if (bitPair.length < 2) {
       return;
     }
 
-    const [high, low] = bitPair;
+    let [high, low] = bitPair;
 
-    let h = (high / 10) | 0;
-    let l = (low / 10) | 0;
+    // let h = (high / 10) | 0;
+    // let l = (low / 10) | 0;
 
-    // tiny bit of hand massaging. there would be an error on the size of the
-    // pulse, but that would then have a massive knock on effect, so I correct
-    // it here manually if it's an expected margin of error.
-    if (h !== l) {
-      if (low === 11) {
-        l = 1;
-      }
+    // // tiny bit of hand massaging. there would be an error on the size of the
+    // // pulse, but that would then have a massive knock on effect, so I correct
+    // // it here manually if it's an expected margin of error.
+    // if (h !== l) {
+    //   if (low === 11) {
+    //     l = 1;
+    //   }
 
-      if (high === 22) {
-        h = 1;
-      }
+    //   if (high === 22) {
+    //     h = 1;
+    //   }
 
-      if (low === 9) {
-        l = 1;
-      } else if (high === 9 && low === 10) {
-        h = 1;
-      } else if (high === 9 && low === 11) {
-        h = 1;
-      }
-    }
+    //   if (low === 9) {
+    //     l = 1;
+    //   } else if (high === 9 && low === 10) {
+    //     h = 1;
+    //   } else if (high === 9 && low === 11) {
+    //     h = 1;
+    //   }
+    // }
 
-    if (this.blockType === null) {
-      return;
-    }
-
-    if (h !== l) {
+    if (high !== low) {
       this.handlers.error(
         'bad pair',
         high,
         low,
-        `${h} != ${l}`,
+        `${high} != ${low}`,
         `byte @ ${this.bytePtr}`
       );
-      bitPair.shift();
-      return;
+      bitPair.pop();
+      this.readPulse(bitPair[0]);
+      // return;
+      high = pulse;
     }
     this.bitPair = [];
 
@@ -450,7 +460,10 @@ export default class TAPLoader {
     // first left shifting by 1 bit, then adding the new bit
     // until we have a full byte
     const waveLength = round(1 / SAMPLE_RATE * (high + low), 3);
-    const bit = waveLength === oneLength ? 0b1 : 0b0;
+    // const bit = waveLength === oneLength ? 0b1 : 0b0;
+
+    const bit = high === ONE ? 0b1 : 0b0;
+
     this.byteBuffer[0] <<= 1; // left shift
     this.byteBuffer[0] += bit;
 
@@ -463,20 +476,30 @@ export default class TAPLoader {
       this.bytesBuffer[this.bytesPtr] = this.byteBuffer[0];
       // console.log(this.byteBuffer[this.bytesPtr].toString(2).padStart(8, '0'));
       // this.queue.push({ type: 'byte', value: byte });
+      // console.log('byte', this.byteBuffer[0]);
       this.bytesPtr++;
       this.bytePtr = 0;
     }
   }
 
   readData() {
-    if (this.state.header && this.state.type === 3 && !this.state.complete) {
-      this.state.data = this.bytesBuffer.slice(0, this.bytesPtr);
+    const strict = tap.strict
+      ? this.state.header.fileType === 3 &&
+        // this.state.header.param1 === 0x4000 &&
+        this.state.header.length === 6912
+      : true;
+
+    if (this.blockType === 0xff && strict && !this.state.complete) {
+      this.state.data = this.bytesBuffer.slice(1, this.bytesPtr);
     }
   }
 
   readPilot(pulse) {
     const state = this.state;
     if (this.pulseType === PILOT) {
+      if (this.state.synOff) {
+        // console.log('resetting syn');
+      }
       this.state.synOff = false;
       this.state.synOn = false;
 

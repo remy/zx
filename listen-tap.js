@@ -1,8 +1,6 @@
 import ctx from './ctx.js';
 import main from './main.js';
-let started = false;
-
-start();
+import Audio from './audio.js';
 
 window.onkeydown = e => {
   if (e.which === 27) {
@@ -11,8 +9,6 @@ window.onkeydown = e => {
 };
 
 async function start() {
-  if (started) return;
-
   const devices = await navigator.mediaDevices.enumerateDevices();
 
   const usb = devices.filter(_ => _.label.includes('USB Audio Device'));
@@ -22,7 +18,6 @@ async function start() {
     console.log('using usb audio', audioSource);
   }
 
-  started = true;
   navigator.getUserMedia(
     {
       audio: {
@@ -31,11 +26,13 @@ async function start() {
       },
     },
     stream => {
-      window.stream = stream;
-      const audio = ctx.createMediaStreamSource(stream);
-      audio.connect(ctx.destination);
+      const audio = (window.stream = new Audio());
+      audio.loadFromStream(stream);
+      audio.volume = 100;
       main(audio);
     },
     err => console.error(err)
   );
 }
+
+start();

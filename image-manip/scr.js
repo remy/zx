@@ -92,6 +92,7 @@ export async function stream(ctx, byte, index) {
   const third = index >> 11; // 0..2047, 2048..4095, 4096..6143
 
   if (third === 3) {
+    // colour
     const attribs = readAttributes(byte);
     const x = (index % 32) * 8;
     const y = ((index >> 5) % 64) * 8;
@@ -392,9 +393,6 @@ export function attributesForBlock(block, print) {
   }
 
   if (print) {
-  }
-
-  if (print) {
     Object.keys(inks).forEach(
       (ink, count) =>
         inks[count] && console.log('ink %s (%s)', ink, inks[count])
@@ -416,14 +414,27 @@ export function attributesForBlock(block, print) {
     [ink, paper] = [paper, ink];
   }
 
-  // work out based on majority ink, whether we need a bright block
+  // work out the brightness based on the majority ink
   if (ink >> 3 === 0 || paper >> 3 === 0) {
-    // we're dealing with bright
-    if (print) console.log('dealing with bright');
-    if (ink >> 3 === 0 && inks[ink] > inks[paper]) {
-      attribute += 64;
-    } else if (paper >> 3 === 0 && inks[paper] > inks[ink]) {
-      attribute += 64;
+    // if ink or paper is black, then take the brightness from the other colour
+    if (ink === 0 || paper === 0) {
+      const colour = ink === 0 ? paper : ink;
+      if (colour >>> 3 === 0) {
+        // colour is bright
+        attribute += 64;
+      } else {
+        // not bright
+      }
+    } else {
+      // we're dealing with bright
+      if (print) console.log('dealing with bright');
+      if (ink >> 3 === 0 && inks[ink] > inks[paper]) {
+        if (print) console.log('ink > paper', ink, paper);
+        attribute += 64;
+      } else if (paper >> 3 === 0 && inks[paper] > inks[ink]) {
+        if (print) console.log('paper > ink');
+        attribute += 64;
+      }
     }
   }
 
@@ -447,7 +458,7 @@ export function putAttributes(pixels, inkData) {
   for (let y = 0; y < 192 / 8; y++) {
     for (let x = 0; x < 256 / 8; x++) {
       const block = zoom.pixel(x, y);
-      const print = y === 18 && x === 20;
+      const print = false; // x === 28 && y === 19;
 
       pixels[2048 * 3 + ptr] = attributesForBlock(block, print);
 

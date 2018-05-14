@@ -86,7 +86,7 @@ export default async function main(audio) {
   TYPES.set(null, 'searching');
   TYPES.set(0, 'PROGRAM');
   TYPES.set(1, 'NUMERIC ARRAY');
-  TYPES.set(2, 'ALPHA ARRAY');
+  TYPES.set(2, 'CHAR ARRAY');
   TYPES.set(3, 'BYTE HEADER');
 
   let pilot = 170;
@@ -99,9 +99,9 @@ export default async function main(audio) {
     const length = tap.state.header ? tap.state.header.length : 0;
     pre.innerHTML = `bufferSize: ${tap.edgePtr}
 pulseBufferPtr: ${tap.pulseBufferPtr}
-readCount: ${tap.readCount}
+bytesPtr: ${tap.bytesPtr}
 edgeCounter: ${tap.edgeCounter}
-timing: ${tap.timing}
+<!-- timing: ${tap.timing} -->
 last byte: ${tap.byteBuffer[0].toString(2).padStart(8, '0')}
 new bytes: ${Array.from(newBytes)
       .map(_ =>
@@ -112,8 +112,8 @@ new bytes: ${Array.from(newBytes)
       .join(' ')}
 
 LAST: ${PULSE_TYPES.get(tap.pulseType)}
-BLOCK_TYPE: ${tap.blockType}
-HEADER: ${TYPES.get(tap.state.type)}
+BLOCK_TYPE: ${tap.blockType === 0xff ? 'DATA' : 'HEADER'}
+HEADER: ${TYPES.get(tap.state.header.fileType)}
 PILOT: ${tap.state.pilot}
 SYN_ON: ${tap.state.synOn}
 SYN_OFF: ${tap.state.synOff}
