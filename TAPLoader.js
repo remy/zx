@@ -88,6 +88,7 @@ export default class TAPLoader {
       bytes: () => {},
       bit: () => {},
       end: () => {},
+      reset: () => {},
       update: () => {},
       error: (...error) => {
         console.error.apply(console, error);
@@ -184,7 +185,7 @@ export default class TAPLoader {
     }
 
     if (this.pulseType === SILENCE) {
-      if (false && this.state.pilot) {
+      if (this.state.pilot) {
         console.log(
           'reset',
           this.blockType === 0 ? 'header' : 'data',
@@ -400,6 +401,7 @@ export default class TAPLoader {
       state.header = header;
 
       console.log('HEADER: OK', this.state.header, bytes);
+      this.queue.push({ type: 'header', value: header });
     }
   }
 
@@ -509,13 +511,11 @@ export default class TAPLoader {
       if (state.type === 3) {
         if (state.pilot === PILOT_DATA_COUNT) {
           console.log('DATA PILOT: OK');
-          this.queue.push({ type: 'pilot', value: true });
         }
       } else {
         if (state.pilot === PILOT_COUNT) {
           // state.pilot = true;
           console.log('PILOT: OK');
-          this.queue.push({ type: 'pilot', value: true });
         }
       }
     }
@@ -533,6 +533,7 @@ export default class TAPLoader {
 
     if (this.pulseType === SYN_OFF) {
       console.log('SYN_OFF: OK');
+      this.queue.push({ type: 'pilot', value: true });
       this.state.synOff = true;
     }
   }

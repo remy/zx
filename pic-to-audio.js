@@ -20,14 +20,11 @@ document.documentElement.onclick = async () => {
 };
 
 async function main(_url) {
-  url = _url;
-
-  console.log(url);
   // 1. capture image
-  const pixels = await dither(url); //`https://twivatar.glitch.me/${username}`);
-  console.log(pixels.length);
+  const pixels = await dither(_url); //`https://twivatar.glitch.me/${username}`);
 
-  if (!audio) {
+  if (url !== _url) {
+    url = _url;
     // first run, so render
     const scrCtx = document.createElement('canvas').getContext('2d');
     scrCtx.canvas.width = 256;

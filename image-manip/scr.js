@@ -88,6 +88,7 @@ async function draw(ctx, third, data) {
   }
 }
 
+// stream individual whole bytes into the canvas
 export async function stream(ctx, byte, index) {
   const third = index >> 11; // 0..2047, 2048..4095, 4096..6143
 

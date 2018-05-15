@@ -148,7 +148,7 @@ export function generateBytes({ offset = 0, data, output, blockType = 0x00 }) {
     offset = generateByte({ offset, output, byte });
   }
 
-  const parity = calculateXORChecksum([blockType, ...data]);
+  const parity = calculateXORChecksum([blockType, ...Array.from(data)]);
   offset = generateByte({ offset, output, byte: parity });
 
   // always append a single pulse so that the edge detection works

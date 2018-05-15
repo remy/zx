@@ -1,23 +1,23 @@
 import ctx from './ctx.js';
 import canvas from './canvas.js';
 import { generateSamplesForRange, ONE, ZERO, T, SAMPLE_RATE } from './audio.js';
-import binary from './hex.js';
+// import binary from './hex.js';
 
-// const binary = 'Remy Sharp woz here'
-//   // turn into array of characters
-//   .split('')
-//   // map into binary strings (4 x 8 bit binary representations)
-//   .map(
-//     chr =>
-//       chr
-//         .charCodeAt(0) // R = 82
-//         .toString(2) // 82 = 1010010
-//         .padStart(8, '0') // 1010010 = 01010010
-//   )
-//   // convert to one single binary array
-//   .reduce((acc, byte) => {
-//     return acc.concat(byte.split('').map(n => parseInt(n, 10)));
-//   }, []);
+const binary = 'Remy Sharp woz here'
+  // turn into array of characters
+  .split('')
+  // map into binary strings (4 x 8 bit binary representations)
+  .map(
+    chr =>
+      chr
+        .charCodeAt(0) // R = 82
+        .toString(2) // 82 = 1010010
+        .padStart(8, '0') // 1010010 = 01010010
+  )
+  // convert to one single binary array
+  .reduce((acc, byte) => {
+    return acc.concat(byte.split('').map(n => parseInt(n, 10)));
+  }, []);
 
 // note: `+ 0.5 | 0` rounds up to the nearest int
 // ONE is imported with a value of 1710
@@ -43,4 +43,4 @@ src.start();
 src.connect(ctx.destination);
 
 // visualise the data
-canvas.connect(src);
+canvas.connect({ node: src });
