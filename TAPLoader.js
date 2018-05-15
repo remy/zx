@@ -84,7 +84,7 @@ export default class TAPLoader {
     this.handlers = {
       pilot: () => {},
       syn: [],
-      header: [],
+      header: () => {},
       bytes: () => {},
       bit: () => {},
       end: () => {},
@@ -486,7 +486,7 @@ export default class TAPLoader {
   }
 
   readData() {
-    const strict = tap.strict
+    const strict = this.strict
       ? this.state.header.fileType === 3 &&
         // this.state.header.param1 === 0x4000 &&
         this.state.header.length === 6912

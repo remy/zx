@@ -1,5 +1,5 @@
 import Audio from './audio.js';
-import ROMLoader from './ROMLoader.js';
+import ROMLoader from './TAPLoader.js';
 import canvas from './canvas.js';
 import Bars from './bars.js';
 import { stream } from './image-manip/scr.js';
@@ -13,9 +13,7 @@ async function main() {
   audio.volume = 100;
   const rom = (window.rom = new ROMLoader());
   rom.connect(audio);
-  canvas.connect(audio.node);
-
-  console.log(audio.src.buffer.length);
+  canvas.connect(audio);
 
   document.documentElement.onkeydown = e => {
     if (e.which === 27) {
@@ -44,7 +42,6 @@ async function main() {
       newBytes = bytes.slice(prevLength);
       bars.draw(newBytes);
       newBytes.forEach((byte, i) => stream(imgCtx, byte, prevLength + i));
-      console.log(prevLength, bytes.length);
       prevLength = bytes.length;
     }
   };
