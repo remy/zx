@@ -35,9 +35,9 @@ const PULSE_LENGTH = new Map([
 
 export const isEdge = (a, b) => !((a >= 0) ^ (b < 0));
 
-export default class TAPLoader {
+export default class TAPLoader extends AudioWorkletProcessor {
   constructor() {
-    // super();
+    super();
     console.log('construct');
     this.strict = true;
     this.pulseBuffer = new Float32Array(bufferSize * 2);
@@ -100,19 +100,20 @@ export default class TAPLoader {
     };
   }
 
-  process(inputs, output) {
-    debugger;
+  process(inputs, outputs) {
+    const stream = 0;
+
     const channel = 0;
-    const inputBuffer = audioProcessingEvent.inputBuffer;
-    const input = inputBuffer.getChannelData(channel);
+    const input = inputs[stream][channel];
 
     // then we'll read the values for own processing
-    this.read(input, performance.now());
+    this.read(input, 0);
 
     // copy the input directly across to the output
-    const outputBuffer = audioProcessingEvent.outputBuffer;
-    const output = outputBuffer.getChannelData(channel);
-    inputBuffer.copyFromChannel(output, channel, channel);
+    const output = outputs[stream][channel];
+    output.set(input, 0);
+
+    return true;
   }
 
   handleMessage(event) {
@@ -164,21 +165,27 @@ export default class TAPLoader {
   }
 
   update() {
-    window.cancelAnimationFrame(this.updateTimer);
-    this.updateTimer = window.requestAnimationFrame(() => {
-      this.handlers.update(this);
-      if (this.state.data.length) {
-        this.handlers.bytes(this.state.data, this.state.header);
+    // window.cancelAnimationFrame(this.updateTimer);
+    this.port.postMessage({ event: 'update', data: this.state });
+    if (this.state.data.length) {
+      // this.handlers.bytes(this.state.data, this.state.header);
+      this.port.postMessage({
+        event: 'bytes',
+        data: this.state.data,
+      });
+    }
+    if (this.queue.length) {
+      let event = null;
+      while ((event = this.queue.shift())) {
+        this.port.postMessage({
+          event: event.type,
+          data: event.value,
+        });
+        // if (this.handlers[event.type]) {
+        // this.handlers[event.type](event.value);
+        // }
       }
-      if (this.queue.length) {
-        let event = null;
-        while ((event = this.queue.shift())) {
-          if (this.handlers[event.type]) {
-            this.handlers[event.type](event.value);
-          }
-        }
-      }
-    });
+    }
   }
 
   // main routine
@@ -264,17 +271,16 @@ export default class TAPLoader {
       if (last !== null) {
         if (point === 0) {
           // bad data
-          continue;
+          // continue;
         }
 
         // this ignores small noise from a mic input
         if (point > limit * -1 && point < limit) {
-          continue;
+          // continue;
         }
 
         // an edge is where the audio crosses the zero line in a wave
         if (isEdge(point, last)) {
-          // console.log(point);
           // pulse is the length of the half pulse wave
           const pulse = this.pulseBufferPtr;
 
@@ -397,7 +403,7 @@ export default class TAPLoader {
       }
 
       header.fileType = get(bytes, 1)[0]; // 2
-      header.filename = decode(get(bytes, 10)); // 12
+      header.filename = get(bytes, 10); // 12
       // get(bytes, 1);
       header.length = get(bytes, 2); // 14
       header.param1 = get(bytes, 2); // 16
@@ -583,3 +589,54 @@ export default class TAPLoader {
     this.handlers[event] = handler;
   }
 }
+
+// console.log(TAPProcessor);
+// console.log('ok');
+
+/**
+ * .TAP cassette tape processor
+ *
+ * @class TAPProcessor
+ * @extends AudioWorkletProcessor
+ */
+class ___TAPLoader extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this._lastUpdate = currentTime;
+    this.port.onmessage = this.handleMessage.bind(this);
+  }
+
+  handleMessage(event) {
+    console.log(
+      '[Processor:Received] "' +
+        event.data.message +
+        '" (' +
+        event.data.timeStamp +
+        ')'
+    );
+  }
+
+  process(inputs, outputs) {
+    console.log('process');
+    // Post a message to the node for every 1 second.
+    if (currentTime - this._lastUpdate > 1.0) {
+      this.port.postMessage({
+        message: 'Process is called.',
+        timeStamp: currentTime,
+      });
+      this._lastUpdate = currentTime;
+    }
+
+    let input = inputs[0];
+    let output = outputs[0];
+    for (let channel = 0; channel < input.length; ++channel) {
+      let inputChannel = input[channel];
+      let outputChannel = output[channel];
+      for (let i = 0; i < inputChannel.length; ++i)
+        outputChannel[i] = inputChannel[i];
+    }
+
+    return true;
+  }
+}
+registerProcessor('tap-processor', TAPLoader);
