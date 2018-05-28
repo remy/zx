@@ -7,7 +7,7 @@ import {
 
 import Zoom from '../Zoom.js';
 
-const toBlink = [];
+let toBlink = [];
 let blinkOn = false;
 
 function block(
@@ -153,6 +153,40 @@ export function pixelsForSCR(buffer, ctx) {
   return pixels;
 }
 
+export function loadBlinkAttributes(buffer, ctx) {
+  toBlink = [];
+
+  // 768
+  for (let i = 6144; i <= 6912; i++) {
+    const attribute = buffer[i];
+    const { ink, paper, blink } = readAttributes(attribute);
+    if (blink && ink.join('') !== paper.join('')) {
+      const x = i % 32;
+      const y = (i >> 5) % 64;
+
+      toBlink.push({
+        attribute,
+        i,
+        x,
+        y,
+      });
+    }
+  }
+
+  let timer = null;
+
+  const blink = {
+    start: () => {
+      timer = setInterval(() => doBlink(ctx, buffer), 333);
+    },
+    stop: () => {
+      return clearInterval(timer);
+    },
+  };
+
+  return blink;
+}
+
 async function colour(ctx, buffer) {
   const attribs = buffer.subarray(2048 * 3);
 
@@ -196,7 +230,7 @@ function doBlink(ctx, buffer) {
 }
 
 export default async function main(url) {
-  const buffer = await load(url || './remy.scr');
+  const buffer = await load(url || './screens/remy.scr');
 
   const canvas = document.createElement('canvas');
   const log = document.createElement('pre');
@@ -273,7 +307,7 @@ blink: ${blink}
 }
 
 export function blink(ctx, buffer) {
-  setInterval(() => doBlink(ctx, buffer), 333);
+  return setInterval(() => doBlink(ctx, buffer), 333);
 }
 
 export function readAttributes(byte) {
@@ -484,4 +518,19 @@ export function putAttributes(pixels, inkData) {
       ptr++;
     }
   }
+}
+
+export function download(data, filename = 'image.png', type = 'image/png') {
+  const click = function(node) {
+    var event = new MouseEvent('click');
+    node.dispatchEvent(event);
+  };
+
+  const a = document.createElement('a');
+  a.download = filename;
+  const blob = new Blob([data], { type });
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  click(a);
+  URL.revokeObjectURL(url);
 }

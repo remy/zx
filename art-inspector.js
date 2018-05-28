@@ -1,6 +1,7 @@
 import Dither from './Dither.js';
 import Zoom from './Zoom.js';
 import { imageToCanvas, contrast } from './image.js';
+import { brightColours, normalColours } from './8bit-colour.js';
 import {
   attributesForBlock,
   readAttributes,
@@ -8,18 +9,13 @@ import {
   putAttributes,
   getInkFromPixel,
   putPixels,
+  download,
 } from './image-manip/scr.js';
 
 const ORIGINAL = 0;
 const DITHERED = 1;
 const INKED = 2;
 const FINAL = 3;
-
-document.body.onkeydown = async e => {
-  if (e.key === 'r') {
-    window.location.reload();
-  }
-};
 
 export async function dither(img, all = false) {
   const ctx = imageToCanvas(img, { width: 256, height: 192 });
@@ -81,27 +77,9 @@ async function pixelsToImage(pixels) {
   return new Promise(resolve => (img.onload = () => resolve(img)));
 }
 
-const click = function(node) {
-  var event = new MouseEvent('click');
-  node.dispatchEvent(event);
-};
-
-function download(data, filename = 'image.png', type = 'image/png') {
-  const a = document.createElement('a');
-  a.download = filename;
-  const blob = new Blob([data], { type });
-  const url = URL.createObjectURL(blob);
-  a.href = url;
-  click(a);
-  URL.revokeObjectURL(url);
-}
-
-export default async function main(
-  filename = prompt('Image or @twitter handle')
-) {
-  if (!filename) filename = 'rem';
+export default async function main(filename = 'jsconf') {
   const img = new Image();
-  if (filename.startsWith('@')) {
+  if ((filename || '').startsWith('@')) {
     img.crossOrigin = 'anonymous';
     img.src = `https://twivatar.glitch.me/${filename.slice(1)}`;
   } else {
@@ -128,6 +106,7 @@ export default async function main(
   const container = document.createElement('div');
   document.body.appendChild(container);
   container.className = 'flex';
+  container.id = 'container';
 
   const ctx = document.createElement('canvas').getContext('2d');
   ctx.canvas.width = 256;
@@ -180,6 +159,12 @@ export default async function main(
       return;
     }
 
+    if (e.key === 'r' && !e.metaKey && !e.shiftKey && !e.altKey) {
+      const filename = prompt('Image or @twitter handle');
+      document.querySelector('#container').remove();
+      return main(filename);
+    }
+
     if (e.key === 'D') {
       download(scrBlob, 'image.scr', 'application/binary');
       return;
@@ -203,8 +188,21 @@ export default async function main(
   const zoomInk = new Zoom(layers.get(DITHERED).data, list, `zoom-${DITHERED}`);
   const zoomResult = new Zoom(layers.get(FINAL).data, list, `zoom-${FINAL}`);
 
-  // const binary = document.createElement('pre');
-  // list.appendChild(binary);
+  // silly code, but this triggers all the zooms into the page
+  const x = 0;
+  const y = 0;
+  zoomResult.seeXY(x, y);
+  zoomOriginal.seeXY(x, y);
+  zoomInk.seeXY(x, y);
+  zoomPixel.seeXY(x, y);
+
+  const binary = document.createElement('pre');
+  binary.className = 'attribs';
+  list.appendChild(binary);
+
+  const labels = document.createElement('pre');
+  labels.className = 'attribs-labels';
+  list.appendChild(labels);
 
   zoomResult.sourceCtx = ctx;
 
@@ -227,9 +225,34 @@ export default async function main(
     window.attributesForBlock = attributesForBlock.bind(null, block);
     const debug = y === 18 && x === 20;
     const attribs = readAttributes(byte, debug);
-    const ink = attribs.ink.join(',');
-    const paper = attribs.paper.join(',');
-    // console.log(attribs);
+    console.log(attribs);
+    binary.innerHTML = byte.toString(2).padStart(8, '0');
+
+    const source = attribs.bright ? brightColours : normalColours;
+
+    const values = {
+      ink: byte & 7,
+      paper: (byte & 56) >> 3,
+    };
+
+    const ink = source[values.ink]; // 0b00000111
+    const paper = source[values.paper]; // 0b00111000
+
+    console.log(ink, values.ink);
+
+    labels.innerHTML = ` blink: ${attribs.blink ? 1 : 0}\nbright: ${
+      attribs.bright ? 1 : 0
+    }\n paper: ${values.paper
+      .toString(2)
+      .padStart(
+        3,
+        '0'
+      )} <span class="block" style="background: rgb(${paper})"></span>\n   ink: ${values.ink
+      .toString(2)
+      .padStart(
+        3,
+        '0'
+      )} <span class="block" style="background: rgb(${ink})"></span>`;
   };
 }
 

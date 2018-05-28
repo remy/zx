@@ -3,7 +3,7 @@ import main, { load, pixelsForSCR } from './scr.js';
 // main();
 
 async function simple() {
-  const buffer = await load('./Batman-TheCapedCrusader.scr');
+  const buffer = await load('./screens/Batman-TheCapedCrusader.scr');
 
   const canvas = document.createElement('canvas');
   document.body.appendChild(canvas);
@@ -16,4 +16,4 @@ async function simple() {
   const pixels = pixelsForSCR(buffer, ctx);
 }
 
-main('./Batman-TheCapedCrusader.scr');
+main('./screens/Batman-TheCapedCrusader.scr');
