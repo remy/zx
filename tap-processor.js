@@ -56,21 +56,6 @@ export default class TAPLoader extends AudioWorkletProcessor {
 
     this.updateTimer = null;
 
-    // this.node = ctx.createScriptProcessor(bufferSize, 1, 1);
-    // this.node.onaudioprocess = audioProcessingEvent => {
-    //   const channel = 0;
-    //   const inputBuffer = audioProcessingEvent.inputBuffer;
-    //   const input = inputBuffer.getChannelData(channel);
-
-    //   // then we'll read the values for own processing
-    //   this.read(input, performance.now());
-
-    //   // copy the input directly across to the output
-    //   const outputBuffer = audioProcessingEvent.outputBuffer;
-    //   const output = outputBuffer.getChannelData(channel);
-    //   inputBuffer.copyFromChannel(output, channel, channel);
-    // };
-
     this.readCount = 0;
     this.edgeCounter = 0;
 
@@ -181,9 +166,6 @@ export default class TAPLoader extends AudioWorkletProcessor {
           event: event.type,
           data: event.value,
         });
-        // if (this.handlers[event.type]) {
-        // this.handlers[event.type](event.value);
-        // }
       }
     }
   }
@@ -229,6 +211,7 @@ export default class TAPLoader extends AudioWorkletProcessor {
       this.state.pilot = 0;
       this.bytesPtr = 0;
       this.blockType = null;
+      this.bitPair = [];
     }
     this.update();
   }
@@ -264,14 +247,19 @@ export default class TAPLoader extends AudioWorkletProcessor {
       let point = buffer[this.edgePtr];
 
       if (point > -0.01 && point < 0.01) {
+        // console.log('skip');
+        if (currentTime < 1) {
+          // console.log('skip');
+        }
         continue; // skip this point
       }
 
       // search for when the buffer point crosses the zero threshold
       if (last !== null) {
-        if (point === 0) {
+        if (point === 0 && !this.state.pilot) {
           // bad data
-          // continue;
+          this.pulseBufferPtr++;
+          continue;
         }
 
         // this ignores small noise from a mic input
@@ -280,7 +268,7 @@ export default class TAPLoader extends AudioWorkletProcessor {
         }
 
         // an edge is where the audio crosses the zero line in a wave
-        if (isEdge(point, last)) {
+        if (isEdge(point, last) || (last === 0 && point < 0)) {
           // pulse is the length of the half pulse wave
           const pulse = this.pulseBufferPtr;
 
@@ -313,31 +301,18 @@ export default class TAPLoader extends AudioWorkletProcessor {
   }
 
   pulseIs(pulse) {
-    if (pulse === 27 || pulse === 26 || pulse === 28) {
-      return PILOT;
-    }
-
-    if (pulse === 22 || pulse === 21) {
-      // console.log('ONE');
-      return ONE;
-    }
-
-    if (pulse === 11 || pulse === 10) {
-      // console.log('ZERO');
-      return ZERO;
-    }
+    // if (pulse > 6) console.log(pulse);
 
     // this is poor error handling due to questionable audio quality over the mic
     if (this.state.pilot > 1000) {
       if (!this.state.synOff) {
-        // !this.state.synOn ||
         if (pulse === 8) {
-          // console.log('SYN_ON');
+          console.log('SYN_ON', pulse);
           return SYN_ON;
         }
 
-        if (pulse >= 9 || pulse <= 12) {
-          // console.log('SYN_OFF');
+        if (pulse >= 9 && pulse <= 12) {
+          console.log('SYN_OFF', pulse);
           return SYN_OFF;
         }
       } else {
@@ -349,6 +324,12 @@ export default class TAPLoader extends AudioWorkletProcessor {
           return ONE;
         }
       }
+    }
+
+    if (pulse > 22 && pulse < 30) {
+      // console.log('PILOT');
+      // in reality it's 27
+      return PILOT;
     }
 
     if (this.pulseType === SILENCE && pulse > 100) {
@@ -452,30 +433,6 @@ export default class TAPLoader extends AudioWorkletProcessor {
     }
 
     let [high, low] = bitPair;
-
-    // let h = (high / 10) | 0;
-    // let l = (low / 10) | 0;
-
-    // // tiny bit of hand massaging. there would be an error on the size of the
-    // // pulse, but that would then have a massive knock on effect, so I correct
-    // // it here manually if it's an expected margin of error.
-    // if (h !== l) {
-    //   if (low === 11) {
-    //     l = 1;
-    //   }
-
-    //   if (high === 22) {
-    //     h = 1;
-    //   }
-
-    //   if (low === 9) {
-    //     l = 1;
-    //   } else if (high === 9 && low === 10) {
-    //     h = 1;
-    //   } else if (high === 9 && low === 11) {
-    //     h = 1;
-    //   }
-    // }
 
     if (high !== low) {
       this.handlers.error(

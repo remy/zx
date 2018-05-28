@@ -10,7 +10,7 @@ window.onkeydown = e => {
 
 async function start() {
   const audio = (window.audio = new Audio());
-  await audio.loadFromAudioURL('/audio/joeblade.wav');
+  await audio.loadFromAudioURL('/audio/dan-dare.wav');
   audio.volume = 20;
 
   setTimeout(() => audio.start(), 100);

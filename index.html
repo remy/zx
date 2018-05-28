@@ -36,7 +36,11 @@
     border-color: yellow;
   }
 
-  pre {
+  pre,
+  textarea {
+    outline: 0;
+    resize: none;
+    border: 0;
     display: inline-block;
     background: white;
     padding: 10px;
@@ -80,6 +84,7 @@
 
   .crosshair {
     cursor: none;
+    z-index: auto;
   }
 
   #root {
@@ -122,6 +127,57 @@
     bottom: 5%;
     height: 90%;
   }
+
+  .artwork {
+    display: block;
+    object-fit: contain;
+    flex-grow: 1;
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+  }
+
+  .art-inspector .zoom {
+    display: none;
+  }
+
+  .art-inspector {
+    background: white;
+  }
+
+  .art-inspector .zoom-0 #zoom-0,
+  .art-inspector .zoom-1 #zoom-1,
+  .art-inspector .zoom-2 #zoom-2,
+  .art-inspector .zoom-3 #zoom-3 {
+    display: block;
+  }
+
+  ._scale {
+    height: 100%;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .flex {
+    display: flex;
+    flex-direction: row;
+    object-fit: contain;
+    height: 100%;
+    width: 100%;
+    margin: 0 auto;
+
+  }
+
+  .flex-grow {
+    flex-grow: 1;
+  }
+
+  .flex ul {
+    padding: 0;
+    list-style: none;
+    margin: 0;
+  }
+
 </style>
 <img src="me-int.gif" hidden>
 <img src="rem.png" id="rem" hidden>
@@ -146,12 +202,13 @@
     <li><a href="?screen">screen</a></li>
     <li><a href="?sound-only">sound only</a></li>
     <li><a href="?scr-stream">scr stream</a></li>
-    <li><a href="?retrofy">dither</a></li>
+    <li><a href="?retrofy">retrofy</a></li>
     <li><a href="?image-to-scr">image-to-scr</a></li>
     <li><a href="?complete">👀 complete</a></li>
+    <li><a href="?art-inspector">💅 art inspector</a></li>
     <li><a href="?pic-to-audio">🔈 pic-to-audio</a></li>
     <li><a href="?pic-to-scr">📷 pic-to-scr</a></li>
-    <li><a href="?listen">🎤 listen</a></li>
+    <li><a href="?listen-tap">🎤 listen</a></li>
     <li><a href="?read-audio">🎧 read-audio</a></li>
     <li><a href="?speccy">💻 speccy</a></li>
   </ul>

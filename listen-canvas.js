@@ -1,5 +1,5 @@
 import ctx from './ctx.js';
-import main from './main.js';
+import canvas from './canvas.js';
 import Audio from './audio.js';
 
 window.onkeydown = e => {
@@ -22,7 +22,7 @@ async function start() {
     {
       audio: {
         deviceId: audioSource ? audioSource : undefined,
-        echoCancellation: false,
+        // echoCancellation: false,
         channelCount: 1,
         sampleRate: 44100,
       },
@@ -32,7 +32,7 @@ async function start() {
       audio.loadFromStream(stream);
       audio.volume = 100;
       audio.connectStream();
-      main(audio);
+      canvas.connect(audio);
     },
     err => console.error(err)
   );

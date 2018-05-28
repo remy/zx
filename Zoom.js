@@ -5,17 +5,19 @@ function getIndexForXY(width, x, y) {
 let order = 1;
 
 export default class Zoom {
-  constructor(buffer) {
+  constructor(buffer, target = document.body, id) {
+    this.target = target;
+    this.order = order++;
+    this.id = id || `zoom-${this.order}`;
     if (buffer instanceof HTMLImageElement) {
       const img = buffer;
       const canvas = document.createElement('canvas');
-      document.body.appendChild(canvas);
+      target.appendChild(canvas);
       canvas.width = img.width;
       canvas.height = img.height;
       const ctx = (buffer = canvas.getContext('2d'));
       ctx.drawImage(img, 0, 0);
       img.parentNode.replaceChild(canvas, img);
-      this.order = order++;
     }
 
     if (buffer instanceof CanvasRenderingContext2D) {
@@ -38,9 +40,10 @@ export default class Zoom {
     this._last = null;
   }
 
-  makeVisible(target = document.body) {
+  makeVisible(target = this.target) {
     const canvas = document.createElement('canvas');
     canvas.className = 'zoom';
+    canvas.id = this.id;
     target.appendChild(canvas);
     this.ctx = canvas.getContext('2d');
 

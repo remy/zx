@@ -7,45 +7,6 @@ import { stream } from './image-manip/scr.js';
 
 const decode = a => new TextDecoder().decode(a);
 
-class TapWorkletNode extends AudioWorkletNode {
-  constructor(context) {
-    super(context, 'tap-processor');
-    this.counter = 0;
-    this.port.onmessage = this.handleMessage.bind(this);
-    this.port.postMessage({
-      message: 'Are you ready?',
-      timeStamp: this.context.currentTime,
-    });
-
-    this.handlers = {};
-  }
-
-  get handler() {
-    return this.handlers;
-  }
-
-  handleMessage(event) {
-    this.counter++;
-    console.log(
-      '[Node:Received] "' +
-        event.data.message +
-        '" (' +
-        event.data.timeStamp +
-        ')'
-    );
-
-    // Notify the processor when the node gets 10 messages. Then reset the
-    // counter.
-    if (this.counter > 10) {
-      this.port.postMessage({
-        message: '10 messages!',
-        timeStamp: this.context.currentTime,
-      });
-      this.counter = 0;
-    }
-  }
-}
-
 function readFromMic() {
   return new Promise(async (resolve, reject) => {
     const devices = await navigator.mediaDevices.enumerateDevices();
@@ -57,11 +18,17 @@ function readFromMic() {
       console.log('using usb audio', audioSource);
     }
 
+    console.log(navigator.mediaDevices.getSupportedConstraints());
+
     navigator.getUserMedia(
       {
         audio: {
           deviceId: audioSource ? audioSource : undefined,
           echoCancellation: false,
+          autoGainControl: false,
+          noiseSuppression: false,
+          channelCount: 1,
+          sampleRate: 44100,
         },
       },
       stream => {
@@ -77,20 +44,15 @@ async function main() {
   bars.pilot();
   const audio = (window.audio = new Audio());
   // await audio.loadFromURL('./screens/tap-js.scr');
-  const stream = await readFromMic();
-  audio.loadFromStream(stream);
+  const ear = await readFromMic();
+  audio.loadFromStream(ear);
   audio.volume = 100;
-
-  document.documentElement.onkeydown = e => {
-    if (e.which === 27) {
-      // canvas.stop();
-      audio.stop();
-    }
-  };
 
   // canvas.connect(audio); // spectrum visualiser
 
   const pre = document.createElement('pre');
+  // pre.style.height = '30%';
+  // pre.readOnly = true;
   document.body.appendChild(pre);
   pre.style.position = 'relative';
   pre.style.zIndex = 1;
@@ -118,6 +80,15 @@ async function main() {
 
       rom.connect(ctx.destination);
 
+      document.documentElement.onkeydown = e => {
+        if (e.which === 27) {
+          try {
+            audio.stop();
+            rom.disconnect();
+          } catch (e) {}
+        }
+      };
+
       const handlers = {};
       rom.port.onmessage = ({ data: e }) => {
         const { event, data } = e;
@@ -126,8 +97,6 @@ async function main() {
           handlers[event](data);
         }
       };
-
-      // rom.port.postMessage({ message: 'ready' });
 
       handlers.bytes = bytes => {
         if (bytes.length !== prevLength) {
@@ -167,7 +136,7 @@ async function main() {
         // edgeCounter: ${rom.edgeCounter}
         // timing: ${rom.timing}
         // last byte: ${rom.byteBuffer[0].toString(2).padStart(8, '0')}
-        pre.innerHTML = `
+        pre.innerText = `
 new bytes: ${Array.from(newBytes)
           .map(_ =>
             _.toString(16)

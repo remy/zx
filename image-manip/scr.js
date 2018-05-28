@@ -104,6 +104,14 @@ export async function stream(ctx, byte, index) {
       block.data.set(attribs[type], i * 4);
     }
 
+    if (attribs.blink && attribs.ink !== attribs.paper) {
+      toBlink.push({
+        attribute: byte,
+        x: x / 8,
+        y: y / 8,
+      });
+    }
+
     await put(ctx, block, x, y);
 
     return;
@@ -111,12 +119,18 @@ export async function stream(ctx, byte, index) {
 
   const imageData = new Uint8ClampedArray(4 * 8); // 1x8 pixel array
 
-  // build the line based on the 8bit byte
-  for (let j = 0; j < 8; j++) {
+  for (let j = 7; j >= 0; j--) {
     // determines bit for i, based on MSb
-    const bit = (byte & (1 << (7 - j))) === 0 ? 0 : 255;
-    imageData.set([bit, bit, bit, 255], j * 4);
+    const bit = (byte & (1 << j)) === 0 ? 0 : 255;
+    imageData.set([bit, bit, bit, 255], (7 - j) * 4); // place the bits forward
   }
+
+  // build the line based on the 8bit byte
+  // for (let j = 0; j < 8; j++) {
+  //   // determines bit for i, based on MSb
+  //   const bit = (byte & (1 << (7 - j))) === 0 ? 0 : 255;
+  //   imageData.set([bit, bit, bit, 255], j * 4);
+  // }
 
   const x = index % 32;
   const y = ((index >> 5) * 8) % 64 + third * 56; // this is the y coord
@@ -255,6 +269,10 @@ blink: ${blink}
     });
   };
 
+  setInterval(() => doBlink(ctx, buffer), 333);
+}
+
+export function blink(ctx, buffer) {
   setInterval(() => doBlink(ctx, buffer), 333);
 }
 

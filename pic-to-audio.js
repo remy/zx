@@ -1,3 +1,4 @@
+import ctx from './ctx.js';
 import { dither } from './retrofy.js';
 import Audio from './audio.js';
 // import canvas from './canvas.js';
@@ -36,6 +37,28 @@ async function main(_url) {
 
   audio = window.audio = new Audio();
   await audio.loadFromData(pixels);
+
+  var streamDestination = ctx.createMediaStreamDestination();
+  audio.node.connect(streamDestination);
+
+  // supported types https://cs.chromium.org/chromium/src/third_party/WebKit/LayoutTests/fast/mediarecorder/MediaRecorder-isTypeSupported.html
+  var mediaRecorder = (window.recorder = new MediaRecorder(
+    streamDestination.stream,
+    { mimeType: 'audio/webm;codecs=pcm', bitsPerSecond: ctx.sampleRate }
+  ));
+  // mediaRecorder.mimeType = 'audio/wav'; // audio/webm or audio/ogg or audio/wav
+  mediaRecorder.ondataavailable = blob => {
+    // POST/PUT "Blob" using FormData/XHR2
+    const blobURL = URL.createObjectURL(blob.data);
+    console.log(blobURL);
+    const link = document.createElement('a');
+    link.href = blobURL;
+    link.download = 'tap-js.wav';
+    link.innerHTML = 'Download WAV';
+    document.body.appendChild(link);
+  };
+  mediaRecorder.start();
+
   audio.volume = 100;
   // canvas.connect(audio);
 

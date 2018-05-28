@@ -2,7 +2,7 @@ import ctx from './ctx.js';
 import canvas from './canvas.js';
 import Bars from './bars.js';
 import TAPLoader from './TAPLoader.js';
-import { PILOT, ONE, ZERO, SYN_OFF, SYN_ON } from './audio.js';
+import { PILOT, ONE, ZERO, SYN_OFF, SYN_ON } from './audio-consts.js';
 import { stream } from './image-manip/scr.js';
 
 const PULSE_TYPES = (window.PULSE_TYPES = new Map());
