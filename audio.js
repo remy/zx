@@ -295,11 +295,11 @@ export function generateAutoLoader({ ctx }) {
   });
 }
 
-export function generateScreenBlock({ ctx, data }) {
+export function generateScreenBlock({ ctx, data, filename = 'image.scr' }) {
   return generateBlock({
     ctx,
     data,
-    filename: 'image.scr',
+    filename,
     param1: 0x4000, // 0x4000 for SCREEN$
     param2: 0x8000,
     type: 'CODE',
@@ -547,7 +547,11 @@ export default class Audio {
     const res = await fetch(url);
     if (res.status !== 200) throw new Error(res.status);
     const binary = await res.arrayBuffer();
-    const buffer = generateHeader(ctx, filename, new Uint8Array(binary));
+    const buffer = generateScreenBlock({
+      ctx,
+      data: new Uint8Array(binary),
+      filename,
+    });
     this.loadFromBuffer(buffer);
   }
 

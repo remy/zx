@@ -199,6 +199,9 @@ async function main() {
         .shift()}.scr`
     );
     setTimeout(() => audio.start(), 100);
+  } else if (username === 'fail') {
+    await audio.loadFromURL('./screens/fail.scr');
+    setTimeout(() => audio.start(), 100);
   } else if (username.length) {
     await audio.loadFromURL(
       'https://scr.isthe.link/get?q=' + username,

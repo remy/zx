@@ -77,7 +77,7 @@ async function pixelsToImage(pixels) {
   return new Promise(resolve => (img.onload = () => resolve(img)));
 }
 
-export default async function main(filename = 'jsconf') {
+export default async function main(filename = 'rem') {
   const img = new Image();
   if ((filename || '').startsWith('@')) {
     img.crossOrigin = 'anonymous';
