@@ -177,7 +177,6 @@
     list-style: none;
     margin: 0;
   }
-
 </style>
 <img src="me-int.gif" hidden>
 <img src="rem.png" id="rem" hidden>
@@ -214,6 +213,10 @@
   </ul>
 </script>
 <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js');
+  }</script>
+<script>
   if (window.location.search) {
     const script = document.createElement('script');
     script.type = 'module';
@@ -224,5 +227,5 @@
   } else {
     document.documentElement.innerHTML = document.querySelector('#index').innerHTML;
   }
-
+  // note - all HTML after this point gets blown away!
 </script>

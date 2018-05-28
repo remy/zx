@@ -134,7 +134,9 @@ function readFromMic() {
   return new Promise(async (resolve, reject) => {
     const devices = await navigator.mediaDevices.enumerateDevices();
 
-    const usb = devices.filter(_ => _.label.includes('USB Audio Device'));
+    const usb = devices.filter(
+      _ => _.label.includes('USB') || _.label.toLowerCase().includes('default')
+    );
     let audioSource = null;
     if (usb.length) {
       audioSource = usb[0].deviceId;

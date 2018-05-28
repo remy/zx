@@ -507,9 +507,15 @@ export default class Audio {
     this.loadFromBuffer(buffer);
   }
 
-  async loadFromData(data, filename = 'image.scr') {
-    // this.loadFromBuffer(generateHeader(ctx, filename, new Uint8Array(data)));
-    this.loadFromBuffer(generateROMImage({ ctx, data: new Uint8Array(data) }));
+  async loadFromData(data, filename = 'image.scr', screenOnly = false) {
+    let buffer;
+    if (screenOnly) {
+      buffer = generateScreenBlock({ ctx, data: new Uint8Array(data) });
+    } else {
+      buffer = generateROMImage({ ctx, data: new Uint8Array(data) });
+    }
+
+    this.loadFromBuffer(buffer);
   }
 
   async loadFromAudioURL(url) {
@@ -563,6 +569,7 @@ export default class Audio {
   }
 
   stop() {
+    this.src.disconnect();
     this.gain.disconnect();
   }
 

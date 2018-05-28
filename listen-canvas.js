@@ -2,29 +2,82 @@ import ctx from './ctx.js';
 import canvas from './canvas.js';
 import Audio from './audio.js';
 
+function stop() {
+  try {
+    console.log('stop');
+    window.stream.stop();
+    canvas.stop();
+  } catch (e) {}
+}
+
 window.onkeydown = e => {
   if (e.which === 27) {
-    window.stream.stop();
+    stop();
   }
 };
 
-async function start() {
-  const devices = await navigator.mediaDevices.enumerateDevices();
+function init() {
+  const c = document.createElement('div');
+  document.body.appendChild(c);
 
-  const usb = devices.filter(_ => _.label.includes('USB Audio Device'));
+  c.innerHTML = `
+  <style>
+  .button-wrapper {
+    max-width: 800px;
+    margin: 20px auto;
+  }
+  button {
+    font-size: 2rem;
+    margin: 20px;
+    background: white;
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+    user-select: none;
+  }</style>
+  <div class="button-wrapper">
+    <button id="default">default options</button>
+    <button>echoCancellation: false</button>
+    <button id="stop">stop</button>
+    <button id="reload">reset</button>
+  </div>
+`;
+
+  Array.from(document.querySelectorAll('button')).forEach(b => {
+    b.onclick = () => {
+      if (b.id === 'reload') {
+        return window.location.reload();
+      }
+
+      if (b.id === 'stop') {
+        return stop();
+      }
+      start(b.id === 'default');
+    };
+  });
+}
+
+async function start(echoCancellation = true) {
+  stop();
+  const devices = (await navigator.mediaDevices.enumerateDevices()).filter(
+    _ => _.kind === 'audioinput'
+  );
+  console.log(devices);
+  const usb = devices.filter(
+    _ => _.label.includes('USB') || _.label.toLowerCase().includes('default')
+  );
   let audioSource = null;
   if (usb.length) {
     audioSource = usb[0].deviceId;
     console.log('using usb audio', audioSource);
   }
 
+  console.log('echoCancellation', echoCancellation);
   navigator.getUserMedia(
     {
       audio: {
         deviceId: audioSource ? audioSource : undefined,
-        // echoCancellation: false,
-        channelCount: 1,
-        sampleRate: 44100,
+        echoCancellation,
       },
     },
     stream => {
@@ -38,4 +91,4 @@ async function start() {
   );
 }
 
-start();
+init();

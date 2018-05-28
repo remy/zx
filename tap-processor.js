@@ -320,7 +320,7 @@ export default class TAPLoader extends AudioWorkletProcessor {
           return ZERO;
         }
 
-        if (pulse > 15 && pulse < 30) {
+        if (pulse > 15 && pulse < 40) {
           return ONE;
         }
       }
@@ -442,9 +442,10 @@ export default class TAPLoader extends AudioWorkletProcessor {
         `${high} != ${low}`,
         `byte @ ${this.bytePtr}`
       );
-      bitPair.pop();
-      this.readPulse(bitPair[0]);
-      // return;
+      // bitPair.pop();
+      // this.readPulse(bitPair[0]);
+      bitPair.shift();
+      return;
       high = pulse;
     }
     this.bitPair = [];
