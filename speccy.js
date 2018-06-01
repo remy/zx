@@ -57,7 +57,10 @@ function handleKeys(ctx) {
     ctx.imageSmoothingEnabled = false;
 
     ctx.fillStyle = 'black';
-    ctx.fillText('© 1982 Sinclair Research Ltd', 0, ctx.canvas.height - 1.5);
+
+    const intro = window.top === window ? '1982 Sinclair' : '2018 JSCONF';
+
+    ctx.fillText(`© ${intro} Research Ltd`, 0, ctx.canvas.height - 1.5);
 
     let timer = null;
     let flip = false;
@@ -162,7 +165,6 @@ async function main() {
   const { div, screen } = setupDOM();
   const bars = new Bars();
   div.appendChild(bars.canvas);
-  bars.pilot();
 
   const tap = (window.tap = new TAPLoader());
 
@@ -228,14 +230,15 @@ async function main() {
       bars.draw(newBytes);
       newBytes.forEach((byte, i) => stream(screenCtx, byte, prevLength + i));
       prevLength = bytes.length;
-      if (bytes.length === 6912) {
-        blink(screenCtx, bytes);
+      if (bytes.length >= 6912) {
+        blink(screenCtx, bytes.slice(0, 6912));
       }
     }
   };
 
   tap.handlers.header = header => {
     screenCtx.fillStyle = PRE_PILOT;
+    screenCtx.save();
     screenCtx.fillRect(0, 0, screenCtx.canvas.width, screenCtx.canvas.height);
     screenCtx.fillStyle = 'black';
     screenCtx.fillText(
@@ -243,6 +246,7 @@ async function main() {
       0,
       16
     );
+    screenCtx.restore();
     console.log(header);
   };
 
@@ -251,7 +255,7 @@ async function main() {
   };
 
   tap.handlers.reset = () => {
-    screenCtx.fillRect(0, 0, screenCtx.canvas.width, screenCtx.canvas.height);
+    // screenCtx.fillRect(0, 0, screenCtx.canvas.width, screenCtx.canvas.height);
     bars.reset();
   };
 

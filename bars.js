@@ -15,7 +15,14 @@ export default class Bars {
     this.height = canvas.height = height + this.padTop * 2;
     this.width = canvas.width = width + this.padLeft * 2;
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    const ctx = (this.ctx = canvas.getContext('2d'));
+
+    ctx.font = '7px ZX-Spectrum';
+    ctx.mozImageSmoothingEnabled = false;
+    ctx.imageSmoothingQuality = 'low';
+    ctx.webkitImageSmoothingEnabled = false;
+    ctx.msImageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = false;
 
     this.reset();
   }
@@ -59,17 +66,17 @@ export default class Bars {
     );
   }
 
+  clear() {
+    this.ctx.fillRect(0, 0, this.width, this.height);
+  }
+
   draw(bytes) {
     const { ctx, height, width, bg, fg } = this;
 
     const data = new Uint8Array(bytes.length * 8);
     for (let i = 0; i < bytes.length; i++) {
-      const binary = bytes[i] // FIXME decide whether it's faster to shift
-        .toString(2)
-        .padStart(8, '0')
-        .split('');
-      for (let j = 0; j < binary.length; j++) {
-        data[i * 8 + j] = binary[j] === '1' ? 1 : 0;
+      for (let j = 7; j >= 0; j--) {
+        data[i * 8 + j] = (bytes[i] >> j) & 1;
       }
     }
 

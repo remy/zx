@@ -207,6 +207,7 @@ export default class TAPLoader {
           this.blockType === 0 ? 'header' : 'data',
           this.bytesBuffer.slice(0, this.bytesPtr)
         );
+        this.queue.push({ type: 'reset' });
       }
       this.state.pilot = 0;
       this.bytesPtr = 0;
@@ -382,7 +383,6 @@ export default class TAPLoader {
 
       header.fileType = get(bytes, 1)[0]; // 2
       header.filename = decode(get(bytes, 10)); // 12
-      // get(bytes, 1);
       header.length = get(bytes, 2); // 14
       header.param1 = get(bytes, 2); // 16
       header.param2 = get(bytes, 2); // 17
@@ -430,30 +430,6 @@ export default class TAPLoader {
     }
 
     let [high, low] = bitPair;
-
-    // let h = (high / 10) | 0;
-    // let l = (low / 10) | 0;
-
-    // // tiny bit of hand massaging. there would be an error on the size of the
-    // // pulse, but that would then have a massive knock on effect, so I correct
-    // // it here manually if it's an expected margin of error.
-    // if (h !== l) {
-    //   if (low === 11) {
-    //     l = 1;
-    //   }
-
-    //   if (high === 22) {
-    //     h = 1;
-    //   }
-
-    //   if (low === 9) {
-    //     l = 1;
-    //   } else if (high === 9 && low === 10) {
-    //     h = 1;
-    //   } else if (high === 9 && low === 11) {
-    //     h = 1;
-    //   }
-    // }
 
     if (high !== low) {
       this.handlers.error(

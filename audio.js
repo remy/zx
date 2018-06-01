@@ -265,15 +265,6 @@ export function generateBlock({
     value: LOW,
   });
 
-  // final length
-  // byteAsWord(data.length + 2).forEach(byte => {
-  //   offset = generateByte({
-  //     offset,
-  //     output,
-  //     byte,
-  //   });
-  // });
-
   offset = generateBytes({ offset, output, data, blockType: 0xff });
 
   offset = generateSilence({

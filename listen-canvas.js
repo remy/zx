@@ -14,6 +14,11 @@ window.onkeydown = e => {
   if (e.which === 27) {
     stop();
   }
+
+  if (e.key === 'e') {
+    document.querySelector('#echo').hidden = !document.querySelector('#echo')
+      .hidden;
+  }
 };
 
 function init() {
@@ -37,7 +42,7 @@ function init() {
   }</style>
   <div class="button-wrapper">
     <button id="default">default options</button>
-    <button>echoCancellation: false</button>
+    <button id="echo" hidden>echoCancellation: false</button><br>
     <button id="stop">stop</button>
     <button id="reload">reset</button>
   </div>

@@ -1,6 +1,6 @@
 // we'll version our cache (and learn how to delete caches in
 // some other post)
-const cacheName = 'v6::static';
+const cacheName = 'v10::static';
 
 self.addEventListener('install', e => {
   // once the SW is installed, go ahead and fetch the resources
@@ -38,6 +38,7 @@ self.addEventListener('install', e => {
           'audioworker.js',
           'audioworklet.js',
           'bars.js',
+          'bars-only.js',
           'binary-to-audio.js',
           'canvas.js',
           'colour.js',
