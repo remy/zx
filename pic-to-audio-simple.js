@@ -2,7 +2,7 @@ import ctx from './ctx.js';
 import { dither } from './retrofy.js';
 import Audio from './audio.js';
 // import canvas from './canvas.js';
-import { pixelsForSCR } from './image-manip/scr.js';
+import { pixelsForSCR, download } from './image-manip/scr.js';
 
 let running = false;
 let url = null;
@@ -33,6 +33,17 @@ async function main(_url) {
     scrCtx.canvas.width = 256;
     scrCtx.canvas.height = 192;
     document.body.appendChild(scrCtx.canvas);
+
+    const button = document.createElement('button');
+    button.innerHTML = 'Download';
+    document.body.appendChild(button);
+    button.onclick = async () => {
+      const blob = await new Promise(resolve => scrCtx.canvas.toBlob(resolve));
+      download(blob);
+
+      return;
+    };
+
     // validate our pixels by translating the SCR binary back into a canvas
     pixelsForSCR(pixels, scrCtx);
   }

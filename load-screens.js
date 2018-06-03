@@ -32,6 +32,8 @@ const screens = [
   'tap-js.scr',
 ].sort((a, b) => (a.toLowerCase() < b.toLowerCase() ? -1 : 1));
 
+const pick = 'jetpac.scr';
+
 let blink = { stop: () => {} };
 let filename = null;
 let ctx;
@@ -92,7 +94,7 @@ async function render() {
     if (e.target.nodeName === 'A') loadSCR(e.target.dataset.name, ctx);
   };
 
-  loadSCR(screens[0], ctx);
+  loadSCR(screens.find(_ => _ === pick), ctx);
 }
 
 render('./screens/Batman-TheCapedCrusader.scr');
