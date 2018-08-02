@@ -156,7 +156,6 @@ function colour(ctx, buffer) {
     const y = (i / (ctx.canvas.width / 8)) | 0;
 
     imageData.data.set(block(x, y, buffer));
-    
 
     if (blink && ink.join('') !== paper.join('')) {
       toBlink.push({
@@ -165,7 +164,7 @@ function colour(ctx, buffer) {
         y,
       });
     }
-    
+
     put(ctx, imageData, x * 8, y * 8); // replace the whole shebang
 
     // await sleep(1);
@@ -191,7 +190,7 @@ function doBlink(ctx, buffer) {
 }
 
 async function main() {
-  const buffer = await load('./midnight.scr');
+  const buffer = await load('./screens/midnight.scr');
 
   const canvas = document.createElement('canvas');
   const log = document.createElement('pre');
@@ -238,11 +237,11 @@ x: ${x} (${x / 8})
 y: ${y} (${y / 8})
 byte: ${byte}
 ink: <span style="color: white; text-shadow: 1px 1px 0 #000; background: rgb(${ink.join(
-    ','
-  )})">${(byte & 7).toString(2).padStart(3, '0')}</span>
+      ','
+    )})">${(byte & 7).toString(2).padStart(3, '0')}</span>
 paper: <span style="color: white; text-shadow: 1px 1px 0 #000; background: rgb(${paper.join(
-    ','
-  )})">${((byte & 56) >> 3).toString(2).padStart(3, '0')}</span>
+      ','
+    )})">${((byte & 56) >> 3).toString(2).padStart(3, '0')}</span>
 bright: ${bright}
 blink: ${blink}
 `;

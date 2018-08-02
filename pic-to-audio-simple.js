@@ -21,6 +21,8 @@ document.documentElement.onclick = async () => {
 };
 
 async function main(_url) {
+  if (running) return;
+
   // 1. capture image
   const pixels = await dither(_url); //`https://twivatar.glitch.me/${username}`);
 
@@ -36,31 +38,9 @@ async function main(_url) {
   }
 
   audio = window.audio = new Audio();
-  await audio.loadFromData(pixels);
-
-  var streamDestination = ctx.createMediaStreamDestination();
-  audio.node.connect(streamDestination);
-
-  // supported types https://cs.chromium.org/chromium/src/third_party/WebKit/LayoutTests/fast/mediarecorder/MediaRecorder-isTypeSupported.html
-  var mediaRecorder = (window.recorder = new MediaRecorder(
-    streamDestination.stream,
-    { mimeType: 'audio/webm;codecs=pcm', bitsPerSecond: ctx.sampleRate }
-  ));
-  // mediaRecorder.mimeType = 'audio/wav'; // audio/webm or audio/ogg or audio/wav
-  mediaRecorder.ondataavailable = blob => {
-    // POST/PUT "Blob" using FormData/XHR2
-    const blobURL = URL.createObjectURL(blob.data);
-    console.log(blobURL);
-    const link = document.createElement('a');
-    link.href = blobURL;
-    link.download = 'tap-js.wav';
-    link.innerHTML = 'Download WAV';
-    document.body.appendChild(link);
-  };
-  mediaRecorder.start();
+  await audio.loadFromData(pixels, 'image.scr', true);
 
   audio.volume = 100;
-  // canvas.connect(audio);
 
   document.documentElement.onkeydown = e => {
     if (e.which === 27) {

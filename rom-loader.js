@@ -1,15 +1,16 @@
 import ctx from './ctx.js';
 import image from './image.js';
+import { generateHeader } from './audio.js';
 import {
-  generateHeader,
   calculateXORChecksum,
-  T,
-  SAMPLE_RATE,
   asHz,
+  PILOT_COUNT,
   PILOT,
   ONE,
   ZERO,
-} from './audio.js';
+  T,
+  SAMPLE_RATE,
+} from './audio-consts.js';
 
 const decode = a => new TextDecoder().decode(a);
 

@@ -2,9 +2,9 @@ import { dither } from './retrofy.js';
 import BufferLoader from './BufferLoader.js';
 import audioContext from './ctx.js';
 import Audio from './audio.js';
-import ROMLoader from './ROMLoader.js';
+import TAPLoader from './TAPLoader.js';
 import Bars, { PRE_PILOT } from './bars.js';
-import { stream } from './image-manip/scr.js';
+import { stream, blink } from './image-manip/scr.js';
 
 var click = null;
 
@@ -50,9 +50,14 @@ function handleKeys(ctx) {
     let state = null;
 
     ctx.font = '7px ZX-Spectrum';
+    ctx.mozImageSmoothingEnabled = false;
+    ctx.imageSmoothingQuality = 'low';
+    ctx.webkitImageSmoothingEnabled = false;
+    ctx.msImageSmoothingEnabled = false;
     ctx.imageSmoothingEnabled = false;
+
     ctx.fillStyle = 'black';
-    ctx.fillText('© 1982 Sinclair Research Ltd', 0, ctx.canvas.height - 1);
+    ctx.fillText('© 1982 Sinclair Research Ltd', 0, ctx.canvas.height - 1.5);
 
     let timer = null;
     let flip = false;
@@ -125,60 +130,132 @@ function handleKeys(ctx) {
   });
 }
 
+function readFromMic() {
+  return new Promise(async (resolve, reject) => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+
+    const usb = devices.filter(_ => _.label.includes('USB Audio Device'));
+    let audioSource = null;
+    if (usb.length) {
+      audioSource = usb[0].deviceId;
+      console.log('using usb audio', audioSource);
+    }
+
+    navigator.getUserMedia(
+      {
+        audio: {
+          deviceId: audioSource ? audioSource : undefined,
+          echoCancellation: false,
+        },
+      },
+      stream => {
+        resolve(stream);
+      },
+      err => reject(err)
+    );
+  });
+}
+
 async function main() {
   // 1. read twitter handle from loading prompt
 
   const { div, screen } = setupDOM();
   const bars = new Bars();
   div.appendChild(bars.canvas);
-  // bars.pilot();
+  bars.pilot();
 
-  const rom = (window.rom = new ROMLoader());
+  const tap = (window.tap = new TAPLoader());
 
   const screenCtx = screen.getContext('2d');
+  window.screenCtx = screenCtx;
 
   const username = await handleKeys(screenCtx);
 
-  // 2. then dither
-
-  let pixels = [];
-  try {
-    pixels = await dither(`https://twivatar.glitch.me/${username}`);
-  } catch (e) {
-    const ctx = screenCtx;
-    ctx.fillStyle = PRE_PILOT;
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-    ctx.fillStyle = 'black';
-    ctx.fillText('R Tape loading error, 0:1', 0, ctx.canvas.height - 1);
-
-    return;
-  }
-
-  // 3. play as audio
+  // prepare audio
   bars.pilot();
   const audio = (window.audio = new Audio());
-  await audio.loadFromData(pixels);
-  rom.connect(audio);
+
+  let pixels = [];
+  if (username.startsWith('@')) {
+    try {
+      pixels = await dither(`https://twivatar.glitch.me/${username.slice(1)}`);
+    } catch (e) {
+      const ctx = screenCtx;
+      ctx.fillStyle = PRE_PILOT;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+      ctx.fillStyle = 'black';
+      ctx.fillText('R Tape loading error, 0:1', 0, ctx.canvas.height - 1);
+
+      return;
+    }
+    await audio.loadFromData(pixels);
+    setTimeout(() => audio.start(), 100);
+  } else if (username.startsWith('./')) {
+    await audio.loadFromURL(
+      `./screens/${username
+        .slice(2)
+        .split('.')
+        .shift()}.scr`
+    );
+    setTimeout(() => audio.start(), 100);
+  } else if (username === 'fail') {
+    await audio.loadFromURL('./screens/fail.scr');
+    setTimeout(() => audio.start(), 100);
+  } else if (username.length) {
+    await audio.loadFromURL(
+      'https://scr.isthe.link/get?q=' + username,
+      username
+    );
+    setTimeout(() => audio.start(), 100);
+  } else {
+    const stream = await readFromMic();
+    audio.loadFromStream(stream);
+    audio.connectStream();
+  }
+
+  console.log('connected');
+
+  tap.connect(audio);
   audio.volume = 100;
 
   let prevLength = 0;
   let newBytes = new Uint8Array(0); // updated as this type later
 
-  rom.handlers.bytes = bytes => {
+  tap.handlers.bytes = bytes => {
     if (bytes.length !== prevLength) {
       newBytes = bytes.slice(prevLength);
       bars.draw(newBytes);
       newBytes.forEach((byte, i) => stream(screenCtx, byte, prevLength + i));
       prevLength = bytes.length;
+      if (bytes.length === 6912) {
+        blink(screenCtx, bytes);
+      }
     }
   };
 
-  rom.handlers.pilot = () => {
+  tap.handlers.header = header => {
+    screenCtx.fillStyle = PRE_PILOT;
+    screenCtx.fillRect(0, 0, screenCtx.canvas.width, screenCtx.canvas.height);
+    screenCtx.fillStyle = 'black';
+    screenCtx.fillText(
+      `${header.fileType === 0 ? 'Program' : 'Bytes'}: ${header.filename}`,
+      0,
+      16
+    );
+    console.log(header);
+  };
+
+  tap.handlers.pilot = () => {
     bars.pilotDone();
   };
 
-  rom.handlers.end = () => {
+  tap.handlers.reset = () => {
+    screenCtx.fillRect(0, 0, screenCtx.canvas.width, screenCtx.canvas.height);
+    bars.reset();
+  };
+
+  tap.handlers.end = () => {
     console.log('finished');
     // canvas.stop();
     audio.stop();
@@ -186,14 +263,12 @@ async function main() {
   };
 
   let pilot = 170;
-  rom.handlers.update = () => {
-    if (rom.state.pilot !== true && rom.state.pilot > 1500) {
+  tap.handlers.update = () => {
+    if (tap.state.pilot !== true && tap.state.pilot > 1500) {
       pilot ^= 0xff;
       bars.draw(new Uint8Array(Array.from({ length: 4 }, () => pilot)));
     }
   };
-
-  setTimeout(() => audio.start(), 0);
 }
 
 main();

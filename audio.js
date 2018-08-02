@@ -1,37 +1,34 @@
 import ctx from './ctx.js';
 import image from './image.js';
-export const SAMPLE_RATE = ctx.sampleRate;
-export const T = 1 / 3500000; // pulse width (half a wave cycle) in ms @ 3.5Mhz
 
-/**
- * notes
- * 440Hz = 1 tick every 2.2727ms
- * 855 * 2 * T = 1710 * T = ZERO bit sound = 0.489ms
- * 1.19047619ms ~ the 840Hz which should be equal to 2168 T (.619428571ms)
- * Pilot is 2168 T for a length of 8063, therefore: (8063 * 2168) * (1/3500000) = ~5 (5 seconds)
- */
-
-export const asHz = pulse => 1 / (T * pulse);
-export const toAngularFrequency = hz => hz * 2 * Math.PI;
-
-// these are how high and low the pulse value goes in the audio buffer
-// 1 and -1 being the extreme max
-const HIGH = 0.15;
-const LOW = -0.15;
-
-// pulse lengths defined by ZX ROM documentation
-export const PILOT = 2168;
-export const PILOT_COUNT = 8063;
-export const PILOT_DATA_COUNT = 3223;
-export const ZERO = 855;
-export const ONE = 2 * ZERO;
-export const SYN_ON = 667;
-export const SYN_OFF = 735;
+import {
+  SAMPLE_RATE,
+  T,
+  HIGH,
+  LOW,
+  asHz,
+  toAngularFrequency,
+  PILOT,
+  LOADER,
+  PILOT_COUNT,
+  PILOT_DATA_COUNT,
+  ZERO,
+  ONE,
+  SYN_ON,
+  SYN_OFF,
+  byteAsWord,
+  calculateXORChecksum,
+  encode,
+  decode,
+} from './audio-consts.js';
 
 const zeroBit = generateBit(ZERO);
 const oneBit = generateBit(ONE);
 
 const _volume = Symbol('volume');
+
+const BLOCK_TYPE = new Map([['HEADER', 0], ['DATA', 0xff]]);
+const FILE_TYPE = new Map([['PROGRAM', 0], ['CODE', 0x03]]);
 
 /**
  * Generates AudioContext buffer compatible values into options.output
@@ -163,12 +160,201 @@ export function generateBytes({ offset = 0, data, output, blockType = 0x00 }) {
   return offset;
 }
 
-/**
- * Returns XOR checksum for array
- * @param {Uint8Array} array
- */
-export const calculateXORChecksum = array =>
-  array.reduce((checksum, item) => checksum ^ item, 0);
+export function calculateSampleSize(...pulses) {
+  return (
+    (pulses.reduce((acc, curr) => (acc += curr), 0) * T * SAMPLE_RATE + 0.5) | 0
+  );
+}
+
+export function headerAsBytes({
+  filename = 'ZX Spectrum',
+  filetype = 0x03, // or 0xff
+  length,
+  param1 = 0x4000,
+  param2 = 0x8000,
+}) {
+  return new Uint8Array([
+    filetype,
+    ...encode(filename.padEnd(10, ' ')), // Name (filename 10 chars padded with white space)
+    ...byteAsWord(length),
+    ...byteAsWord(param1),
+    ...byteAsWord(param2),
+  ]);
+}
+
+export function generateBlock({
+  ctx,
+  data,
+  param1,
+  param2,
+  filename,
+  type = 'PROGRAM',
+}) {
+  const filetype = FILE_TYPE.get(type);
+
+  // pre-calculate the count of samples required
+  const SILENCE = PILOT_DATA_COUNT * PILOT;
+  const length = calculateSampleSize(
+    PILOT_COUNT * PILOT,
+    SYN_ON * 2,
+    SYN_OFF * 2,
+    SILENCE * 2,
+    PILOT_DATA_COUNT * PILOT,
+    ONE * 2, // closing pulses
+    19 * 8 * (ONE * 2), // flag + file type + header (16) + parity
+    data.length * 8 * (ONE * 2),
+    (1 + 1) * 8 * (ONE * 2) // length, file type, parity
+  );
+
+  // the +0.5 is just a little "wiggle" room
+  const buffer = ctx.createBuffer(1, (length + 0.5) | 0, SAMPLE_RATE);
+  const output = buffer.getChannelData(0);
+
+  // pilot tone
+  let offset = generatePilot({ output });
+
+  // syn on
+  offset = generateFlatSamples({
+    output,
+    offset,
+    pulse: SYN_ON,
+    value: HIGH,
+  });
+
+  // syn off
+  offset = generateFlatSamples({
+    output,
+    offset,
+    pulse: SYN_OFF,
+    value: LOW,
+  });
+
+  offset = generateBytes({
+    output,
+    offset,
+    blockType: 0x00, // header
+    data: headerAsBytes({
+      filetype,
+      filename,
+      length: data.length,
+      param1,
+      param2,
+    }),
+  });
+
+  offset = generateSilence({
+    output,
+    offset,
+  });
+
+  offset = generatePilot({ offset, output, count: PILOT_DATA_COUNT });
+
+  // syn on
+  offset = generateFlatSamples({
+    output,
+    offset,
+    pulse: SYN_ON,
+    value: HIGH,
+  });
+
+  // syn off
+  offset = generateFlatSamples({
+    output,
+    offset,
+    pulse: SYN_OFF,
+    value: LOW,
+  });
+
+  // final length
+  // byteAsWord(data.length + 2).forEach(byte => {
+  //   offset = generateByte({
+  //     offset,
+  //     output,
+  //     byte,
+  //   });
+  // });
+
+  offset = generateBytes({ offset, output, data, blockType: 0xff });
+
+  offset = generateSilence({
+    output,
+    offset,
+  });
+
+  return buffer;
+}
+
+export function generateAutoLoader({ ctx }) {
+  return generateBlock({
+    ctx,
+    data: LOADER,
+    filename: 'tap dot js',
+    param1: 10, // Autostart LINE Number
+    param2: LOADER.length, // Size of the PROG area aka start of the VARS area
+    type: 'PROGRAM',
+  });
+}
+
+export function generateScreenBlock({ ctx, data, filename = 'image.scr' }) {
+  return generateBlock({
+    ctx,
+    data,
+    filename,
+    param1: 0x4000, // 0x4000 for SCREEN$
+    param2: 0x8000,
+    type: 'CODE',
+  });
+}
+
+export function combineTapImages(ctx, ...taps) {
+  let length = 0;
+  const buffers = taps.map(tap => {
+    const buffer = tap.getChannelData(0);
+    length += buffer.length;
+    return buffer;
+  });
+
+  const buffer = ctx.createBuffer(1, (length + 0.5) | 0, SAMPLE_RATE);
+  const output = buffer.getChannelData(0);
+
+  let offset = 0;
+
+  buffers.forEach(buffer => {
+    output.set(buffer, offset);
+    offset += buffer.length;
+  });
+
+  return buffer;
+}
+
+export function generateROMImage({ ctx, data }) {
+  const loader = generateAutoLoader({ ctx });
+  const screen = generateScreenBlock({ ctx, data });
+
+  return combineTapImages(ctx, loader, screen);
+}
+
+export function generateROMImageAsTap({ ctx, data }) {
+  const loader = generateBlock({
+    ctx,
+    data: LOADER,
+    filename: 'tap dot js',
+    param1: 10, // Autostart LINE Number
+    param2: LOADER.length, // Size of the PROG area aka start of the VARS area
+    type: 'PROGRAM',
+  });
+
+  const screen = generateBlock({
+    ctx,
+    data,
+    filename: 'image.scr',
+    param1: 0x4000, // 0x4000 for SCREEN$
+    param2: 0x8000,
+    type: 'CODE',
+  });
+
+  return combineTapImages(ctx, loader, screen);
+}
 
 /**
  * Construct buffer for pilot, syn(on|off), header and data binary
@@ -259,13 +445,6 @@ export function generateHeader(ctx, filename = 'ZX Loader', data = [0]) {
     value: LOW,
   });
 
-  // bytes also include the blockType byte and the XOR checksum
-  offset = generateBytes({
-    offset,
-    output,
-    data: header,
-  });
-
   offset = generateSilence({
     output,
     offset,
@@ -288,6 +467,18 @@ export function generateHeader(ctx, filename = 'ZX Loader', data = [0]) {
     pulse: SYN_OFF,
     value: LOW,
   });
+
+  // bytes also include the blockType byte and the XOR checksum
+  offset = generateBytes({
+    offset,
+    output,
+    data: header,
+  });
+
+  // add a word (LSb) of the next block length:
+  // 0x1B02 = 6914 = 1b flag (0xFF) + 6912 (data) + 1b parity
+  offset = generateByte({ offset, output, byte: 0x02 });
+  offset = generateByte({ offset, output, byte: 0x1b });
 
   offset = generateBytes({
     blockType: 0xff,
@@ -316,8 +507,15 @@ export default class Audio {
     this.loadFromBuffer(buffer);
   }
 
-  async loadFromData(data, filename = 'image.scr') {
-    this.loadFromBuffer(generateHeader(ctx, filename, new Uint8Array(data)));
+  async loadFromData(data, filename = 'image.scr', screenOnly = false) {
+    let buffer;
+    if (screenOnly) {
+      buffer = generateScreenBlock({ ctx, data: new Uint8Array(data) });
+    } else {
+      buffer = generateROMImage({ ctx, data: new Uint8Array(data) });
+    }
+
+    this.loadFromBuffer(buffer);
   }
 
   async loadFromAudioURL(url) {
@@ -338,23 +536,35 @@ export default class Audio {
   async loadFromStream(stream) {
     const audio = ctx.createMediaStreamSource(stream);
     this.src = audio;
+  }
+
+  connectStream() {
     this.src.connect(this.gain);
     this.gain.connect(ctx.destination);
   }
 
-  async loadFromURL(url) {
+  async loadFromURL(url, filename = url.split('/').pop()) {
     const res = await fetch(url);
+    if (res.status !== 200) throw new Error(res.status);
     const binary = await res.arrayBuffer();
-    const buffer = generateHeader(
+    const buffer = generateScreenBlock({
       ctx,
-      url.split('/').pop(),
-      new Uint8Array(binary)
-    );
+      data: new Uint8Array(binary),
+      filename,
+    });
     this.loadFromBuffer(buffer);
   }
 
   loadFromBuffer(buffer) {
     this.src.buffer = buffer;
+  }
+
+  outTo(node) {
+    this.src.connect(node);
+  }
+
+  inFrom(node) {
+    node.connect(this.gain);
   }
 
   start() {
@@ -363,6 +573,7 @@ export default class Audio {
   }
 
   stop() {
+    this.src.disconnect();
     this.gain.disconnect();
   }
 

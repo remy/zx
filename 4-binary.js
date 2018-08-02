@@ -1,6 +1,7 @@
 import ctx from './ctx.js';
 import canvas from './canvas.js';
-import { ONE, T, generateBytes } from './audio.js';
+import { ONE, T } from './audio-consts.js';
+import { generateBytes } from './audio.js';
 
 // import { source } from './hex.js';
 window.ctx = ctx;

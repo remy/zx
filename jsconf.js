@@ -50,9 +50,14 @@ function handleKeys(ctx) {
     let state = null;
 
     ctx.font = '7px ZX-Spectrum';
+    ctx.mozImageSmoothingEnabled = false;
+    ctx.imageSmoothingQuality = 'low';
+    ctx.webkitImageSmoothingEnabled = false;
+    ctx.msImageSmoothingEnabled = false;
     ctx.imageSmoothingEnabled = false;
+
     ctx.fillStyle = 'black';
-    ctx.fillText('© 2018 JSCONF Research Ltd', 0, ctx.canvas.height - 1);
+    ctx.fillText('© 2018 JSCONF Research Ltd', 0, ctx.canvas.height - 1.5);
 
     let timer = null;
     let flip = false;
@@ -129,7 +134,9 @@ function readFromMic() {
   return new Promise(async (resolve, reject) => {
     const devices = await navigator.mediaDevices.enumerateDevices();
 
-    const usb = devices.filter(_ => _.label.includes('USB Audio Device'));
+    const usb = devices.filter(
+      _ => _.label.includes('USB') || _.label.toLowerCase().includes('default')
+    );
     let audioSource = null;
     if (usb.length) {
       audioSource = usb[0].deviceId;
@@ -157,11 +164,12 @@ async function main() {
   const { div, screen } = setupDOM();
   const bars = new Bars();
   div.appendChild(bars.canvas);
-  // bars.pilot();
+  bars.pilot();
 
   const tap = (window.tap = new TAPLoader());
 
   const screenCtx = screen.getContext('2d');
+  window.screenCtx = screenCtx;
 
   const username = await handleKeys(screenCtx);
 
@@ -170,12 +178,9 @@ async function main() {
   const audio = (window.audio = new Audio());
 
   let pixels = [];
-  if (username === 'fail') {
-    await audio.loadFromURL('./screens/fail.scr');
-    setTimeout(() => audio.start(), 100);
-  } else if (username.length) {
+  if (username.startsWith('@')) {
     try {
-      pixels = await dither(`https://twivatar.glitch.me/${username}`);
+      pixels = await dither(`https://twivatar.glitch.me/${username.slice(1)}`);
     } catch (e) {
       const ctx = screenCtx;
       ctx.fillStyle = PRE_PILOT;
@@ -188,10 +193,22 @@ async function main() {
     }
     await audio.loadFromData(pixels);
     setTimeout(() => audio.start(), 100);
+  } else if (username === 'fail') {
+    await audio.loadFromURL('./screens/fail.scr');
+    setTimeout(() => audio.start(), 100);
+  } else if (username.length) {
+    await audio.loadFromURL(
+      'https://scr.isthe.link/get?q=' + username.slice(0, -1),
+      username.slice(0, -1)
+    );
+    setTimeout(() => audio.start(), 100);
   } else {
     const stream = await readFromMic();
     audio.loadFromStream(stream);
+    audio.connectStream();
   }
+
+  console.log('connected');
 
   tap.connect(audio);
   audio.volume = 100;
@@ -212,7 +229,12 @@ async function main() {
     screenCtx.fillStyle = PRE_PILOT;
     screenCtx.fillRect(0, 0, screenCtx.canvas.width, screenCtx.canvas.height);
     screenCtx.fillStyle = 'black';
-    screenCtx.fillText(header.filename, 0, screenCtx.canvas.height - 1);
+    screenCtx.fillText(
+      `${header.fileType === 0 ? 'Program' : 'Bytes'}: ${header.filename}`,
+      0,
+      16
+    );
+
     console.log(header);
   };
 

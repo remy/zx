@@ -7,7 +7,7 @@ import {
 
 import Zoom from '../Zoom.js';
 
-const toBlink = [];
+let toBlink = [];
 let blinkOn = false;
 
 function block(
@@ -104,6 +104,14 @@ export async function stream(ctx, byte, index) {
       block.data.set(attribs[type], i * 4);
     }
 
+    if (attribs.blink && attribs.ink !== attribs.paper) {
+      toBlink.push({
+        attribute: byte,
+        x: x / 8,
+        y: y / 8,
+      });
+    }
+
     await put(ctx, block, x, y);
 
     return;
@@ -111,12 +119,18 @@ export async function stream(ctx, byte, index) {
 
   const imageData = new Uint8ClampedArray(4 * 8); // 1x8 pixel array
 
-  // build the line based on the 8bit byte
-  for (let j = 0; j < 8; j++) {
+  for (let j = 7; j >= 0; j--) {
     // determines bit for i, based on MSb
-    const bit = (byte & (1 << (7 - j))) === 0 ? 0 : 255;
-    imageData.set([bit, bit, bit, 255], j * 4);
+    const bit = (byte & (1 << j)) === 0 ? 0 : 255;
+    imageData.set([bit, bit, bit, 255], (7 - j) * 4); // place the bits forward
   }
+
+  // build the line based on the 8bit byte
+  // for (let j = 0; j < 8; j++) {
+  //   // determines bit for i, based on MSb
+  //   const bit = (byte & (1 << (7 - j))) === 0 ? 0 : 255;
+  //   imageData.set([bit, bit, bit, 255], j * 4);
+  // }
 
   const x = index % 32;
   const y = ((index >> 5) * 8) % 64 + third * 56; // this is the y coord
@@ -137,6 +151,40 @@ export function pixelsForSCR(buffer, ctx) {
   }
 
   return pixels;
+}
+
+export function loadBlinkAttributes(buffer, ctx) {
+  toBlink = [];
+
+  // 768
+  for (let i = 6144; i <= 6912; i++) {
+    const attribute = buffer[i];
+    const { ink, paper, blink } = readAttributes(attribute);
+    if (blink && ink.join('') !== paper.join('')) {
+      const x = i % 32;
+      const y = (i >> 5) % 64;
+
+      toBlink.push({
+        attribute,
+        i,
+        x,
+        y,
+      });
+    }
+  }
+
+  let timer = null;
+
+  const blink = {
+    start: () => {
+      timer = setInterval(() => doBlink(ctx, buffer), 333);
+    },
+    stop: () => {
+      return clearInterval(timer);
+    },
+  };
+
+  return blink;
 }
 
 async function colour(ctx, buffer) {
@@ -182,7 +230,7 @@ function doBlink(ctx, buffer) {
 }
 
 export default async function main(url) {
-  const buffer = await load(url || './remy.scr');
+  const buffer = await load(url || './screens/remy.scr');
 
   const canvas = document.createElement('canvas');
   const log = document.createElement('pre');
@@ -256,6 +304,10 @@ blink: ${blink}
   };
 
   setInterval(() => doBlink(ctx, buffer), 333);
+}
+
+export function blink(ctx, buffer) {
+  return setInterval(() => doBlink(ctx, buffer), 333);
 }
 
 export function readAttributes(byte) {
@@ -466,4 +518,19 @@ export function putAttributes(pixels, inkData) {
       ptr++;
     }
   }
+}
+
+export function download(data, filename = 'image.png', type = 'image/png') {
+  const click = function(node) {
+    var event = new MouseEvent('click');
+    node.dispatchEvent(event);
+  };
+
+  const a = document.createElement('a');
+  a.download = filename;
+  const blob = new Blob([data], { type });
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  click(a);
+  URL.revokeObjectURL(url);
 }

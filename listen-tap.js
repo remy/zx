@@ -23,12 +23,15 @@ async function start() {
       audio: {
         deviceId: audioSource ? audioSource : undefined,
         echoCancellation: false,
+        channelCount: 1,
+        sampleRate: 44100,
       },
     },
     stream => {
       const audio = (window.stream = new Audio());
       audio.loadFromStream(stream);
       audio.volume = 100;
+      audio.connectStream();
       main(audio);
     },
     err => console.error(err)

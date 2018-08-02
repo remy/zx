@@ -9,7 +9,7 @@ import {
   ZERO,
   SYN_ON,
   SYN_OFF,
-} from './audio.js';
+} from './audio-consts.js';
 
 const decode = a => new TextDecoder().decode(a);
 
@@ -282,7 +282,7 @@ export default class ROMLoader {
           this.state.header = { filename, length };
           console.log('%s: %s bytes', filename, length);
         } else {
-          this.state.header.length = 6912;
+          this.state.header = { length: 6912 };
         }
 
         // reset the position of the byteBuffer
