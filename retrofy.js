@@ -77,12 +77,16 @@ async function pixelsToImage(pixels) {
   return new Promise(resolve => (img.onload = () => resolve(img)));
 }
 
-export default async function main() {
-  const username = prompt('Give me a twitter handle:');
+export default async function main(
+  url = `https://twivatar.glitch.me/${prompt('Give me a twitter handle:')}`
+) {
+  // export default async function main(url = './image-manip/tap-js.png') {
+  // const username = prompt('Give me a twitter handle:');
 
   // ctx = drawing context with our source image
   const { pixels, inkData, pixelData, originalData } = await dither(
-    `https://twivatar.glitch.me/${username}`,
+    // `https://twivatar.glitch.me/${username}`,
+    url,
     true
   );
 
@@ -148,10 +152,11 @@ export default async function main() {
     const attribs = readAttributes(byte, debug);
     const ink = attribs.ink.join(',');
     const paper = attribs.paper.join(',');
-    attribsLI.innerHTML = `ink: ${ink} (${attribs.values
-      .ink}) <span class="block" style="background: rgb(${ink})"></span>, paper: ${paper} (${attribs
-      .values
-      .paper}) <span class="block" style="background: rgb(${paper})"></span>`;
+    attribsLI.innerHTML = `ink: ${ink} (${
+      attribs.values.ink
+    }) <span class="block" style="background: rgb(${ink})"></span>, paper: ${paper} (${
+      attribs.values.paper
+    }) <span class="block" style="background: rgb(${paper})"></span>`;
   };
 }
 
@@ -176,7 +181,7 @@ function putInkForBlock(
   // 1: find how many colours we're dealing with (256 elements)
   // 2: if 2 - switch them to majority paper (0b0) and least ink (0b1)
   // 3: if more than two, order then select
-  const print = x === 15 && y === 8;
+  const print = x === 3 && y === 1;
   const byte = attributesForBlock(block, print);
   const attributes = readAttributes(byte);
 

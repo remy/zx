@@ -27,6 +27,6 @@ export default function main(binary) {
   src.connect(ctx.destination);
 
   // visualise the data
-  canvas.connect(src);
+  canvas.connect({ node: src });
   return output;
 }

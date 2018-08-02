@@ -1,5 +1,5 @@
 import Audio from './audio.js';
-import ROMLoader from './ROMLoader.js';
+import ROMLoader from './ROMLoader-old.js';
 import canvas from './canvas.js';
 import Bars from './bars.js';
 
@@ -8,7 +8,7 @@ async function main() {
   bars.pilot();
   const audio = (window.audio = new Audio());
   // await audio.load(document.querySelector('img'));
-  await audio.loadFromURL('./image-manip/midnight.scr');
+  await audio.loadFromURL('./screens/midnight.scr');
   audio.volume = 100;
   const rom = (window.rom = new ROMLoader());
   rom.connect(audio);
@@ -82,12 +82,12 @@ edgeCounter: ${rom.edgeCounter}
 timing: ${rom.timing}
 last byte: ${rom.byteBuffer[0].toString(2).padStart(8, '0')}
 new bytes: ${Array.from(newBytes)
-    .map(_ =>
-      _.toString(16)
-        .toUpperCase()
-        .padStart(2, '0')
-    )
-    .join(' ')}
+      .map(_ =>
+        _.toString(16)
+          .toUpperCase()
+          .padStart(2, '0')
+      )
+      .join(' ')}
 
 SAMPLE_RATE: ${rom.SAMPLE_RATE}
 PILOT: ${rom.state.pilot}

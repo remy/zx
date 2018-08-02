@@ -48,6 +48,9 @@ const elm = document.querySelector('#heart');
 const out = document.querySelector('ul');
 const log = t => (out.innerHTML += `<li>${t}</li>`);
 
+elm.style =
+  'display: block; transform: scale(10); right: 0; position: absolute; transform-origin: 0 0;';
+
 imageToBlob(elm)
   .then(blob => {
     log(`${blob.size} bytes loaded`);
@@ -56,6 +59,7 @@ imageToBlob(elm)
   .then(binary => {
     log(`${binary.length} bits loaded`);
     return toAudio(binary);
-  }).then(audio => {
+  })
+  .then(audio => {
     log(`${audio.length} samples`);
   });

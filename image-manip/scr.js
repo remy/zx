@@ -7,7 +7,7 @@ import {
 
 import Zoom from '../Zoom.js';
 
-const toBlink = [];
+let toBlink = [];
 let blinkOn = false;
 
 function block(
@@ -88,10 +88,12 @@ async function draw(ctx, third, data) {
   }
 }
 
+// stream individual whole bytes into the canvas
 export async function stream(ctx, byte, index) {
   const third = index >> 11; // 0..2047, 2048..4095, 4096..6143
 
   if (third === 3) {
+    // colour
     const attribs = readAttributes(byte);
     const x = (index % 32) * 8;
     const y = ((index >> 5) % 64) * 8;
@@ -102,6 +104,14 @@ export async function stream(ctx, byte, index) {
       block.data.set(attribs[type], i * 4);
     }
 
+    if (attribs.blink && attribs.ink !== attribs.paper) {
+      toBlink.push({
+        attribute: byte,
+        x: x / 8,
+        y: y / 8,
+      });
+    }
+
     await put(ctx, block, x, y);
 
     return;
@@ -109,12 +119,18 @@ export async function stream(ctx, byte, index) {
 
   const imageData = new Uint8ClampedArray(4 * 8); // 1x8 pixel array
 
-  // build the line based on the 8bit byte
-  for (let j = 0; j < 8; j++) {
+  for (let j = 7; j >= 0; j--) {
     // determines bit for i, based on MSb
-    const bit = (byte & (1 << (7 - j))) === 0 ? 0 : 255;
-    imageData.set([bit, bit, bit, 255], j * 4);
+    const bit = (byte & (1 << j)) === 0 ? 0 : 255;
+    imageData.set([bit, bit, bit, 255], (7 - j) * 4); // place the bits forward
   }
+
+  // build the line based on the 8bit byte
+  // for (let j = 0; j < 8; j++) {
+  //   // determines bit for i, based on MSb
+  //   const bit = (byte & (1 << (7 - j))) === 0 ? 0 : 255;
+  //   imageData.set([bit, bit, bit, 255], j * 4);
+  // }
 
   const x = index % 32;
   const y = ((index >> 5) * 8) % 64 + third * 56; // this is the y coord
@@ -135,6 +151,40 @@ export function pixelsForSCR(buffer, ctx) {
   }
 
   return pixels;
+}
+
+export function loadBlinkAttributes(buffer, ctx) {
+  toBlink = [];
+
+  // 768
+  for (let i = 6144; i <= 6912; i++) {
+    const attribute = buffer[i];
+    const { ink, paper, blink } = readAttributes(attribute);
+    if (blink && ink.join('') !== paper.join('')) {
+      const x = i % 32;
+      const y = (i >> 5) % 64;
+
+      toBlink.push({
+        attribute,
+        i,
+        x,
+        y,
+      });
+    }
+  }
+
+  let timer = null;
+
+  const blink = {
+    start: () => {
+      timer = setInterval(() => doBlink(ctx, buffer), 333);
+    },
+    stop: () => {
+      return clearInterval(timer);
+    },
+  };
+
+  return blink;
 }
 
 async function colour(ctx, buffer) {
@@ -180,7 +230,7 @@ function doBlink(ctx, buffer) {
 }
 
 export default async function main(url) {
-  const buffer = await load(url || './remy.scr');
+  const buffer = await load(url || './screens/remy.scr');
 
   const canvas = document.createElement('canvas');
   const log = document.createElement('pre');
@@ -254,6 +304,10 @@ blink: ${blink}
   };
 
   setInterval(() => doBlink(ctx, buffer), 333);
+}
+
+export function blink(ctx, buffer) {
+  return setInterval(() => doBlink(ctx, buffer), 333);
 }
 
 export function readAttributes(byte) {
@@ -392,9 +446,6 @@ export function attributesForBlock(block, print) {
   }
 
   if (print) {
-  }
-
-  if (print) {
     Object.keys(inks).forEach(
       (ink, count) =>
         inks[count] && console.log('ink %s (%s)', ink, inks[count])
@@ -416,14 +467,27 @@ export function attributesForBlock(block, print) {
     [ink, paper] = [paper, ink];
   }
 
-  // work out based on majority ink, whether we need a bright block
+  // work out the brightness based on the majority ink
   if (ink >> 3 === 0 || paper >> 3 === 0) {
-    // we're dealing with bright
-    if (print) console.log('dealing with bright');
-    if (ink >> 3 === 0 && inks[ink] > inks[paper]) {
-      attribute += 64;
-    } else if (paper >> 3 === 0 && inks[paper] > inks[ink]) {
-      attribute += 64;
+    // if ink or paper is black, then take the brightness from the other colour
+    if (ink === 0 || paper === 0) {
+      const colour = ink === 0 ? paper : ink;
+      if (colour >>> 3 === 0) {
+        // colour is bright
+        attribute += 64;
+      } else {
+        // not bright
+      }
+    } else {
+      // we're dealing with bright
+      if (print) console.log('dealing with bright');
+      if (ink >> 3 === 0 && inks[ink] > inks[paper]) {
+        if (print) console.log('ink > paper', ink, paper);
+        attribute += 64;
+      } else if (paper >> 3 === 0 && inks[paper] > inks[ink]) {
+        if (print) console.log('paper > ink');
+        attribute += 64;
+      }
     }
   }
 
@@ -447,11 +511,26 @@ export function putAttributes(pixels, inkData) {
   for (let y = 0; y < 192 / 8; y++) {
     for (let x = 0; x < 256 / 8; x++) {
       const block = zoom.pixel(x, y);
-      const print = y === 18 && x === 20;
+      const print = false; // x === 28 && y === 19;
 
       pixels[2048 * 3 + ptr] = attributesForBlock(block, print);
 
       ptr++;
     }
   }
+}
+
+export function download(data, filename = 'image.png', type = 'image/png') {
+  const click = function(node) {
+    var event = new MouseEvent('click');
+    node.dispatchEvent(event);
+  };
+
+  const a = document.createElement('a');
+  a.download = filename;
+  const blob = new Blob([data], { type });
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  click(a);
+  URL.revokeObjectURL(url);
 }

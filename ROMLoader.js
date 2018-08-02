@@ -1,6 +1,7 @@
 import ctx from './ctx.js';
 import {
   PILOT_COUNT,
+  PILOT_DATA_COUNT,
   calculateXORChecksum,
   asHz,
   PILOT,
@@ -8,7 +9,7 @@ import {
   ZERO,
   SYN_ON,
   SYN_OFF,
-} from './audio.js';
+} from './audio-consts.js';
 
 const decode = a => new TextDecoder().decode(a);
 
@@ -57,17 +58,7 @@ export default class ROMLoader {
 
     this.SAMPLE_RATE = SAMPLE_RATE;
 
-    this.state = {
-      pilot: 0,
-      synOn: false,
-      synOff: false,
-      header: false,
-      data: false,
-      complete: false,
-      bad: [],
-      pulses: [],
-      error: ['n/a'],
-    };
+    this.reset();
 
     this.queue = [];
 
@@ -87,6 +78,23 @@ export default class ROMLoader {
         this.state.error = `#${++errors} ${error.join(' ')} :: ${Date.now() -
           start}ms`;
       },
+    };
+  }
+
+  reset() {
+    this.state = {
+      currentType: null,
+      pilot: 0,
+      synOn: false,
+      synOff: false,
+      header: false,
+      data: false,
+      type: null,
+      complete: false,
+      bad: [],
+      pulses: [],
+      error: ['n/a'],
+      silent: 0,
     };
   }
 
@@ -142,6 +150,7 @@ export default class ROMLoader {
     this.SAMPLE_RATE = (data.length * (1000 / this.timing)) | 0;
 
     let pulse = null;
+    this.state.silent++;
     while ((pulse = this.readPulse())) {
       this.checkFinished();
       this.readByte(pulse);
@@ -149,7 +158,27 @@ export default class ROMLoader {
       this.readHeader();
       this.readSyn(pulse);
       this.readPilot(pulse);
+      this.state.silent = 0;
     }
+
+    if (this.state.silent > 1 && this.state.header !== false) {
+      if (this.state.type !== 3) {
+        // FIXME changing to 1 causes new header to read
+        // 2nd leg
+        this.state.synOff = false;
+        this.state.synOn = false;
+        this.state.pilot = false;
+        this.state.type = null;
+        this.pulseBufferPtr = 0;
+      } else {
+        this.state.pilot = false;
+        this.state.synOff = false;
+        this.state.synOn = false;
+        this.state.pilot = false;
+        // PILOT_DATA_COUNT
+      }
+    }
+
     this.update();
   }
 
@@ -178,24 +207,32 @@ export default class ROMLoader {
 
     const limit = 0.0006; // used when reading from mic
 
+    // for each item in the buffer; do:
     for (; this.edgePtr < length; this.edgePtr++) {
       let point = buffer[this.edgePtr];
 
       // search for when the buffer point crosses the zero threshold
       if (last !== null) {
         if (point === 0) {
+          // bad data
           continue;
         }
 
+        // this is bad sound data
         if (point > limit * -1 && point < limit) {
           continue;
         }
+
+        // an edge is where the audio crosses the zero line in a wave
         if (isEdge(point, last)) {
-          // important: when we hit an edge, the data doesn't include the edge
-          // itself as determined by the use of `i` rather than edgePtr
+          // pulse is the length of the half pulse wave
           const pulse = this.pulseBufferPtr;
 
           this.pulseBufferPtr = 0;
+
+          // important: when we hit an edge, the data doesn't include the edge
+          // itself as determined by the use of `i` rather than edgePtr
+
           this.edgeCounter++;
           return pulse;
         }
@@ -213,28 +250,40 @@ export default class ROMLoader {
 
   readHeader() {
     const state = this.state;
-    if (state.synOff === true && state.header === false) {
-      if (this.bytesPtr === 18) {
-        const bytes = this.bytesBuffer.slice(0, 18);
+    if (
+      (state.synOff === true && state.header === false) ||
+      (state.synOff && state.type === null)
+    ) {
+      // ref https://faqwiki.zxnet.co.uk/wiki/TAP_format#Format_Description
+      if (this.bytesPtr === 19) {
+        const bytes = this.bytesBuffer.slice(0, 19);
 
         const parity = calculateXORChecksum(bytes.slice(0, -1));
 
         if (parity !== bytes[bytes.length - 1]) {
           this.handlers.error(
             'R Tape Loading Error',
-            parity,
-            bytes[bytes.length - 1]
+            'parity: ' + parity,
+            'checksum: ' + bytes[bytes.length - 1],
+            bytes.length,
+            bytes
           );
           return null;
         }
 
-        console.log('HEADER: OK');
+        console.log('HEADER: OK', bytes);
 
-        const filename = decode(bytes.slice(1, 10)); // filename is in position 1…11
-        const length = (bytes[11] << 8) + bytes[12]; // length is held in 2 bytes
+        this.state.type = bytes[1];
 
-        this.state.header = { filename, length };
-        console.log('%s: %s bytes', filename, length);
+        if (this.state.type !== 3) {
+          const filename = decode(bytes.slice(2, 2 + 10)); // filename is in position 1…11
+          const length = (bytes[12] << 8) + bytes[13]; // length is held in 2 bytes
+
+          this.state.header = { filename, length };
+          console.log('%s: %s bytes', filename, length);
+        } else {
+          this.state.header = { length: 6912 };
+        }
 
         // reset the position of the byteBuffer
         this.bytesPtr = 0;
@@ -263,9 +312,19 @@ export default class ROMLoader {
     // pulse, but that would then have a massive knock on effect, so I correct
     // it here manually if it's an expected margin of error.
     if (h !== l) {
+      if (low === 11) {
+        l = 1;
+      }
+
+      if (high === 22) {
+        h = 1;
+      }
+
       if (low === 9) {
         l = 1;
       } else if (high === 9 && low === 10) {
+        h = 1;
+      } else if (high === 9 && low === 11) {
         h = 1;
       }
     }
@@ -298,6 +357,7 @@ export default class ROMLoader {
     if (this.bytePtr === 8) {
       // move to the bytesBuffer
       this.bytesBuffer[this.bytesPtr] = this.byteBuffer[0];
+      // console.log(this.byteBuffer[this.bytesPtr].toString(2).padStart(8, '0'));
       // this.queue.push({ type: 'byte', value: byte });
       this.bytesPtr++;
       this.bytePtr = 0;
@@ -305,7 +365,7 @@ export default class ROMLoader {
   }
 
   readData() {
-    if (this.state.header && !this.state.complete) {
+    if (this.state.header && this.state.type === 3 && !this.state.complete) {
       this.state.data = this.bytesBuffer.slice(0, this.bytesPtr);
     }
   }
@@ -324,17 +384,34 @@ export default class ROMLoader {
             ptr: this.pulseBufferPtr,
           });
         } else {
-          console.log('failed pilot was longer');
+          console.log(
+            'failed pilot (%s) was wrong length: %s < %s',
+            state.pilot,
+            length,
+            pilotLength
+          );
         }
 
-        return;
+        if (state.pilot !== false) {
+          return;
+        }
       }
       state.pilot++;
 
-      if (state.pilot === PILOT_COUNT) {
-        state.pilot = true;
-        console.log('PILOT: OK');
-        this.queue.push({ type: 'pilot', value: true });
+      if (state.type === 3) {
+        if (state.pilot === PILOT_DATA_COUNT) {
+          state.pilot = true;
+          console.log('DATA PILOT: OK');
+          this.queue.push({ type: 'pilot', value: true });
+          state.synOn = true;
+          state.synOff = true;
+        }
+      } else {
+        if (state.pilot === PILOT_COUNT) {
+          state.pilot = true;
+          console.log('PILOT: OK');
+          this.queue.push({ type: 'pilot', value: true });
+        }
       }
     }
   }
