@@ -231,6 +231,11 @@
     navigator.serviceWorker.register('/service-worker.js');
   }</script>
 <script>
+  document.documentElement.onkeydown = e => {
+    if (e.which === 72) {
+      Array.from(document.querySelectorAll('[data-toggle]')).forEach(e => e.hidden = !e.hidden);
+    }
+  }
   if (window.location.search) {
     const script = document.createElement('script');
     script.type = 'module';

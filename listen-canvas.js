@@ -37,7 +37,7 @@ function init() {
   }</style>
   <div class="button-wrapper">
     <button id="default">default options</button>
-    <button>echoCancellation: false</button>
+    <button data-toggle="true" hidden>echoCancellation: false</button>
     <button id="stop">stop</button>
     <button id="reload">reset</button>
   </div>
@@ -64,8 +64,9 @@ async function start(echoCancellation = true) {
   );
   console.log(devices);
   const usb = devices.filter(
-    _ => _.label.includes('USB') || _.label.toLowerCase().includes('default')
+    _ => _.label.includes('USB') || _.deviceId.toLowerCase().includes('default')
   );
+  console.log('test', usb);
   let audioSource = null;
   if (usb.length) {
     audioSource = usb[0].deviceId;
